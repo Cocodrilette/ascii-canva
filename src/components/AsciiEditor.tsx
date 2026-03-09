@@ -1,8 +1,9 @@
-import { Copy, FileText, GripHorizontal, Trash2 } from "lucide-react";
+import { Copy, Download, FileText, GripHorizontal, Trash2 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BoxElement } from "../extensions/builtin/box";
 import type { TextElement } from "../extensions/builtin/text";
+import type { VectorElement } from "../extensions/builtin/vector";
 import { getAllExtensions, getExtension } from "../extensions/registry";
 import type { BaseElement } from "../extensions/types";
 
@@ -10,15 +11,31 @@ const CELL_SIZE = 14;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4.0;
 
+const isInside = (child: BaseElement, parent: BaseElement) => {
+  if (child.id === parent.id) return false;
+  const childBounds = getExtension(child.type).getBounds(child);
+  const parentBounds = getExtension(parent.type).getBounds(parent);
+  return (
+    childBounds.left >= parentBounds.left &&
+    childBounds.right <= parentBounds.right &&
+    childBounds.top >= parentBounds.top &&
+    childBounds.bottom <= parentBounds.bottom
+  );
+};
+
 const AsciiEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [elements, setElements] = useState<BaseElement[]>([
     getExtension("text").create(100, 100, { text: "GENESIS ASCII" }),
     getExtension("box").create(100, 100, { width: 20, height: 6 }),
   ]);
+  const [history, setHistory] = useState<BaseElement[][]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [draggedPointIndex, setDraggedPointIndex] = useState<number | null>(
+    null,
+  );
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [capturedIds, setCapturedIds] = useState<string[]>([]);
 
@@ -34,6 +51,7 @@ const AsciiEditor: React.FC = () => {
     x: number;
     y: number;
     elementId: string;
+    pointIndex?: number;
   } | null>(null);
 
   const visualCellSize = CELL_SIZE * zoom;
@@ -51,17 +69,49 @@ const AsciiEditor: React.FC = () => {
     setContextMenu(null);
   }, []);
 
-  const isInside = useCallback((child: BaseElement, parent: BaseElement) => {
-    if (child.id === parent.id) return false;
-    const childBounds = getExtension(child.type).getBounds(child);
-    const parentBounds = getExtension(parent.type).getBounds(parent);
-    return (
-      childBounds.left >= parentBounds.left &&
-      childBounds.right <= parentBounds.right &&
-      childBounds.top >= parentBounds.top &&
-      childBounds.bottom <= parentBounds.bottom
-    );
+  const pushToHistory = useCallback(() => {
+    setHistory((prev) => {
+      const newHistory = [...prev, elements];
+      if (newHistory.length > 5) return newHistory.slice(1);
+      return newHistory;
+    });
+  }, [elements]);
+
+  const undo = useCallback(() => {
+    setHistory((prev) => {
+      if (prev.length === 0) return prev;
+      const lastState = prev[prev.length - 1];
+      setElements(lastState);
+      return prev.slice(0, -1);
+    });
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        undo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo]);
+
+  // Persistence
+  useEffect(() => {
+    const saved = localStorage.getItem("ascii-canvas-state");
+    if (saved) {
+      try {
+        setElements(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to restore state");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("ascii-canvas-state", JSON.stringify(elements));
+  }, [elements]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -144,6 +194,7 @@ const AsciiEditor: React.FC = () => {
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setIsResizing(false);
+    setDraggedPointIndex(null);
     setIsPanning(false);
     setCapturedIds([]);
   }, []);
@@ -151,6 +202,26 @@ const AsciiEditor: React.FC = () => {
     (e: React.MouseEvent) => {
       e.preventDefault();
       const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
+
+      // Check if right-clicking a vector point handle first
+      const selected = elements.find((el) => el.id === selectedId);
+      if (selected?.type === "vector") {
+        const vec = selected as VectorElement;
+        for (let i = 0; i < vec.points.length; i++) {
+          const p = vec.points[i];
+          const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
+          const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
+          if (Math.abs(e.clientX - px) < 15 && Math.abs(e.clientY - py) < 15) {
+            setContextMenu({
+              x: e.clientX,
+              y: e.clientY,
+              elementId: selected.id,
+              pointIndex: i,
+            });
+            return;
+          }
+        }
+      }
 
       // Logic to select element under right-click if not already selected
       const clickedEl = [...elements]
@@ -172,13 +243,47 @@ const AsciiEditor: React.FC = () => {
 
       if (clickedEl) {
         setSelectedId(clickedEl.id);
-        setContextMenu({ x: e.clientX, y: e.clientY, elementId: clickedEl.id });
+        setContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          elementId: clickedEl.id,
+        });
       } else {
         setSelectedId(null);
         setContextMenu(null);
       }
     },
-    [elements, getGridCoords],
+    [elements, getGridCoords, selectedId, visualCellSize, viewOffset],
+  );
+
+  const deleteVectorPoint = useCallback(
+    (elementId: string, pointIndex: number) => {
+      pushToHistory();
+      setElements((prev) =>
+        prev.map((el) => {
+          if (el.id === elementId && el.type === "vector") {
+            const vec = el as VectorElement;
+            if (vec.points.length <= 2) return el; // Minimum 2 points
+            const newPoints = [...vec.points];
+            newPoints.splice(pointIndex, 1);
+            return {
+              ...vec,
+              x: newPoints[0].x,
+              y: newPoints[0].y,
+              points: newPoints,
+              // If we delete start/end, we might want to clear connection
+              startElementId: pointIndex === 0 ? undefined : vec.startElementId,
+              endElementId:
+                pointIndex === vec.points.length - 1
+                  ? undefined
+                  : vec.endElementId,
+            };
+          }
+          return el;
+        }),
+      );
+    },
+    [pushToHistory],
   );
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -214,14 +319,118 @@ const AsciiEditor: React.FC = () => {
             return el;
           }),
         );
+      } else if (draggedPointIndex !== null && selectedId) {
+        setElements((prev) =>
+          prev.map((el) => {
+            if (el.id === selectedId && el.type === "vector") {
+              const vec = el as VectorElement;
+              const isStart = draggedPointIndex === 0;
+              const isEnd = draggedPointIndex === vec.points.length - 1;
+
+              let finalX = gridX;
+              let finalY = gridY;
+              let hitId: string | undefined;
+
+              if (isStart || isEnd) {
+                const hit = prev.find(
+                  (other) =>
+                    other.id !== selectedId &&
+                    other.type !== "vector" &&
+                    gridX >= getExtension(other.type).getBounds(other).left &&
+                    gridX < getExtension(other.type).getBounds(other).right &&
+                    gridY >= getExtension(other.type).getBounds(other).top &&
+                    gridY < getExtension(other.type).getBounds(other).bottom,
+                );
+
+                if (hit) {
+                  hitId = hit.id;
+                  const b = getExtension(hit.type).getBounds(hit);
+                  const left = b.left;
+                  const right = b.right - 1;
+                  const top = b.top;
+                  const bottom = b.bottom - 1;
+
+                  const dxL = Math.abs(gridX - left);
+                  const dxR = Math.abs(gridX - right);
+                  const dyT = Math.abs(gridY - top);
+                  const dyB = Math.abs(gridY - bottom);
+
+                  const min = Math.min(dxL, dxR, dyT, dyB);
+                  if (min === dxL) finalX = left;
+                  else if (min === dxR) finalX = right;
+                  else if (min === dyT) finalY = top;
+                  else finalY = bottom;
+                }
+              }
+
+              const newPoints = [...vec.points];
+              newPoints[draggedPointIndex] = { x: finalX, y: finalY };
+
+              return {
+                ...vec,
+                x: newPoints[0].x,
+                y: newPoints[0].y,
+                points: newPoints,
+                startElementId: isStart ? hitId : vec.startElementId,
+                endElementId: isEnd ? hitId : vec.endElementId,
+              };
+            }
+            return el;
+          }),
+        );
       } else if (isDragging && selectedId) {
         const dx = gridX - dragOffset.x;
         const dy = gridY - dragOffset.y;
         if (dx !== 0 || dy !== 0) {
+          const movedIds = [selectedId, ...capturedIds];
           setElements((prev) =>
             prev.map((el) => {
-              if (el.id === selectedId || capturedIds.includes(el.id)) {
+              if (movedIds.includes(el.id)) {
+                if (el.type === "vector") {
+                  const vec = el as VectorElement;
+                  const newPoints = vec.points.map((p) => ({
+                    x: p.x + dx,
+                    y: p.y + dy,
+                  }));
+                  return {
+                    ...vec,
+                    x: newPoints[0].x,
+                    y: newPoints[0].y,
+                    points: newPoints,
+                  };
+                }
                 return { ...el, x: el.x + dx, y: el.y + dy };
+              }
+              if (el.type === "vector") {
+                const vec = el as VectorElement;
+                let changed = false;
+                const newPoints = [...vec.points];
+                if (
+                  vec.startElementId &&
+                  movedIds.includes(vec.startElementId)
+                ) {
+                  newPoints[0] = {
+                    x: newPoints[0].x + dx,
+                    y: newPoints[0].y + dy,
+                  };
+                  changed = true;
+                }
+                if (vec.endElementId && movedIds.includes(vec.endElementId)) {
+                  const lastIdx = newPoints.length - 1;
+                  newPoints[lastIdx] = {
+                    x: newPoints[lastIdx].x + dx,
+                    y: newPoints[lastIdx].y + dy,
+                  };
+                  changed = true;
+                }
+                if (changed) {
+                  return {
+                    ...vec,
+                    x: newPoints[0].x,
+                    y: newPoints[0].y,
+                    points: newPoints,
+                  };
+                }
               }
               return el;
             }),
@@ -241,14 +450,14 @@ const AsciiEditor: React.FC = () => {
       dragOffset,
       panStart,
       capturedIds,
-      isInside,
+      draggedPointIndex,
     ],
   );
-
   const handleTouchEnd = useCallback(() => {
     setTouchDist(null);
     setIsDragging(false);
     setIsResizing(false);
+    setDraggedPointIndex(null);
     setIsPanning(false);
     setCapturedIds([]);
   }, []);
@@ -300,16 +509,121 @@ const AsciiEditor: React.FC = () => {
               return el;
             }),
           );
+        } else if (draggedPointIndex !== null && selectedId) {
+          setElements((prev) =>
+            prev.map((el) => {
+              if (el.id === selectedId && el.type === "vector") {
+                const vec = el as VectorElement;
+                const isStart = draggedPointIndex === 0;
+                const isEnd = draggedPointIndex === vec.points.length - 1;
+
+                let finalX = gridX;
+                let finalY = gridY;
+                let hitId: string | undefined;
+
+                if (isStart || isEnd) {
+                  const hit = prev.find(
+                    (other) =>
+                      other.id !== selectedId &&
+                      other.type !== "vector" &&
+                      gridX >= getExtension(other.type).getBounds(other).left &&
+                      gridX < getExtension(other.type).getBounds(other).right &&
+                      gridY >= getExtension(other.type).getBounds(other).top &&
+                      gridY < getExtension(other.type).getBounds(other).bottom,
+                  );
+
+                  if (hit) {
+                    hitId = hit.id;
+                    const b = getExtension(hit.type).getBounds(hit);
+                    const left = b.left;
+                    const right = b.right - 1;
+                    const top = b.top;
+                    const bottom = b.bottom - 1;
+
+                    const dxL = Math.abs(gridX - left);
+                    const dxR = Math.abs(gridX - right);
+                    const dyT = Math.abs(gridY - top);
+                    const dyB = Math.abs(gridY - bottom);
+
+                    const min = Math.min(dxL, dxR, dyT, dyB);
+                    if (min === dxL) finalX = left;
+                    else if (min === dxR) finalX = right;
+                    else if (min === dyT) finalY = top;
+                    else finalY = bottom;
+                  }
+                }
+
+                const newPoints = [...vec.points];
+                newPoints[draggedPointIndex] = { x: finalX, y: finalY };
+
+                return {
+                  ...vec,
+                  x: newPoints[0].x,
+                  y: newPoints[0].y,
+                  points: newPoints,
+                  startElementId: isStart ? hitId : vec.startElementId,
+                  endElementId: isEnd ? hitId : vec.endElementId,
+                };
+              }
+              return el;
+            }),
+          );
         } else if (isDragging && selectedId) {
           const dx = gridX - dragOffset.x;
           const dy = gridY - dragOffset.y;
           if (dx !== 0 || dy !== 0) {
+            const movedIds = [selectedId, ...capturedIds];
             setElements((prev) =>
-              prev.map((el) =>
-                el.id === selectedId || capturedIds.includes(el.id)
-                  ? { ...el, x: el.x + dx, y: el.y + dy }
-                  : el,
-              ),
+              prev.map((el) => {
+                if (movedIds.includes(el.id)) {
+                  if (el.type === "vector") {
+                    const vec = el as VectorElement;
+                    const newPoints = vec.points.map((p) => ({
+                      x: p.x + dx,
+                      y: p.y + dy,
+                    }));
+                    return {
+                      ...vec,
+                      x: newPoints[0].x,
+                      y: newPoints[0].y,
+                      points: newPoints,
+                    };
+                  }
+                  return { ...el, x: el.x + dx, y: el.y + dy };
+                }
+                if (el.type === "vector") {
+                  const vec = el as VectorElement;
+                  let changed = false;
+                  const newPoints = [...vec.points];
+                  if (
+                    vec.startElementId &&
+                    movedIds.includes(vec.startElementId)
+                  ) {
+                    newPoints[0] = {
+                      x: newPoints[0].x + dx,
+                      y: newPoints[0].y + dy,
+                    };
+                    changed = true;
+                  }
+                  if (vec.endElementId && movedIds.includes(vec.endElementId)) {
+                    const lastIdx = newPoints.length - 1;
+                    newPoints[lastIdx] = {
+                      x: newPoints[lastIdx].x + dx,
+                      y: newPoints[lastIdx].y + dy,
+                    };
+                    changed = true;
+                  }
+                  if (changed) {
+                    return {
+                      ...vec,
+                      x: newPoints[0].x,
+                      y: newPoints[0].y,
+                      points: newPoints,
+                    };
+                  }
+                }
+                return el;
+              }),
             );
             setDragOffset({ x: gridX, y: gridY });
           }
@@ -331,7 +645,7 @@ const AsciiEditor: React.FC = () => {
       panStart,
       capturedIds,
       touchDist,
-      isInside,
+      draggedPointIndex,
     ],
   );
 
@@ -380,8 +694,46 @@ const AsciiEditor: React.FC = () => {
         Math.abs(e.clientX - handleX) < 15 &&
         Math.abs(e.clientY - handleY) < 15
       ) {
+        pushToHistory();
         setIsResizing(true);
         return;
+      }
+    }
+
+    if (selected?.type === "vector") {
+      const vec = selected as VectorElement;
+      for (let i = 0; i < vec.points.length; i++) {
+        const p = vec.points[i];
+        const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
+        const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
+
+        if (Math.abs(e.clientX - px) < 15 && Math.abs(e.clientY - py) < 15) {
+          if (e.detail === 2 && vec.points.length < 10) {
+            // Double click: add point after this one
+            pushToHistory();
+            const nextIdx = (i + 1) % vec.points.length;
+            const nextP = vec.points[nextIdx];
+            const newP = {
+              x: Math.round((p.x + nextP.x) / 2),
+              y: Math.round((p.y + nextP.y) / 2),
+            };
+            setElements((prev) =>
+              prev.map((el) => {
+                if (el.id === selectedId) {
+                  const v = el as VectorElement;
+                  const newPoints = [...v.points];
+                  newPoints.splice(i + 1, 0, newP);
+                  return { ...v, points: newPoints };
+                }
+                return el;
+              }),
+            );
+            return;
+          }
+          pushToHistory();
+          setDraggedPointIndex(i);
+          return;
+        }
       }
     }
 
@@ -404,6 +756,7 @@ const AsciiEditor: React.FC = () => {
       });
 
     if (clickedEl) {
+      pushToHistory();
       setSelectedId(clickedEl.id);
       setIsDragging(true);
       setDragOffset({ x: gridX, y: gridY });
@@ -443,8 +796,27 @@ const AsciiEditor: React.FC = () => {
           Math.abs(touch.clientX - handleX) < 30 &&
           Math.abs(touch.clientY - handleY) < 30
         ) {
+          pushToHistory();
           setIsResizing(true);
           return;
+        }
+      }
+
+      if (selected?.type === "vector") {
+        const vec = selected as VectorElement;
+        for (let i = 0; i < vec.points.length; i++) {
+          const p = vec.points[i];
+          const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
+          const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
+
+          if (
+            Math.abs(touch.clientX - px) < 30 &&
+            Math.abs(touch.clientY - py) < 30
+          ) {
+            pushToHistory();
+            setDraggedPointIndex(i);
+            return;
+          }
         }
       }
       const clickedEl = [...elements]
@@ -464,6 +836,7 @@ const AsciiEditor: React.FC = () => {
           );
         });
       if (clickedEl) {
+        pushToHistory();
         setSelectedId(clickedEl.id);
         setIsDragging(true);
         setDragOffset({ x: gridX, y: gridY });
@@ -485,6 +858,11 @@ const AsciiEditor: React.FC = () => {
   };
 
   const addExtensionElement = (type: string) => {
+    if (elements.length >= 100) {
+      alert("System Limit: Maximum 100 elements reached.");
+      return;
+    }
+    pushToHistory();
     const ext = getExtension(type);
     const newEl = ext.create(
       Math.floor((window.innerWidth / 2 - viewOffset.x) / visualCellSize),
@@ -494,6 +872,43 @@ const AsciiEditor: React.FC = () => {
     setElements([...elements, newEl]);
     setNewText("");
     setSelectedId(newEl.id);
+  };
+
+  const saveProject = () => {
+    const data = JSON.stringify(elements, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "canvas_project.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const loadProject = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const loadedElements = JSON.parse(event.target?.result as string);
+        pushToHistory();
+        setElements(loadedElements);
+      } catch (err) {
+        alert("Error: Invalid project file.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const downloadAscii = () => {
+    const blob = new Blob([ascii], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ascii_art.txt";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const updateSelectedText = (text: string) => {
@@ -510,12 +925,13 @@ const AsciiEditor: React.FC = () => {
     (id?: string) => {
       const targetId = id || selectedId;
       if (!targetId) return;
+      pushToHistory();
       setElements((prev) => prev.filter((el) => el.id !== targetId));
       if (targetId === selectedId) {
         setSelectedId(null);
       }
     },
-    [selectedId],
+    [selectedId, pushToHistory],
   );
   const generateAscii = () => {
     if (elements.length === 0) return;
@@ -555,12 +971,31 @@ const AsciiEditor: React.FC = () => {
           <span className="flex items-center gap-2 font-bold">
             Genesis_ASCII.exe
           </span>
-          <button
-            type="button"
-            className="retro-button px-1 py-0 leading-none h-4 w-4 flex items-center justify-center font-bold"
-          >
-            ✕
-          </button>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={saveProject}
+              className="retro-button px-1 py-0 text-[10px]"
+              title="Save Project"
+            >
+              Save
+            </button>
+            <label className="retro-button px-1 py-0 text-[10px] cursor-default">
+              Open
+              <input
+                type="file"
+                onChange={loadProject}
+                className="hidden"
+                accept=".json"
+              />
+            </label>
+            <button
+              type="button"
+              className="retro-button px-1 py-0 leading-none h-4 w-4 flex items-center justify-center font-bold"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         <div className="p-2 flex flex-col gap-2">
           <div className="flex flex-col gap-1">
@@ -638,18 +1073,33 @@ const AsciiEditor: React.FC = () => {
           onMouseDown={(e) => e.stopPropagation()}
           role="menu"
         >
-          {" "}
-          <button
-            type="button"
-            onClick={() => {
-              deleteSelected(contextMenu.elementId);
-              closeContextMenu();
-            }}
-            className="w-full text-left px-4 py-1 ui-label hover:bg-[var(--os-titlebar)] hover:text-white flex items-center gap-2"
-          >
-            {" "}
-            <Trash2 className="w-3 h-3" /> Delete
-          </button>
+          {contextMenu.pointIndex !== undefined ? (
+            <button
+              type="button"
+              onClick={() => {
+                deleteVectorPoint(
+                  contextMenu.elementId,
+                  contextMenu.pointIndex!,
+                );
+                closeContextMenu();
+              }}
+              className="w-full text-left px-4 py-1 ui-label hover:bg-[var(--os-titlebar)] hover:text-white flex items-center gap-2"
+            >
+              <Trash2 className="w-3 h-3" /> Delete Point
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                deleteSelected(contextMenu.elementId);
+                closeContextMenu();
+              }}
+              className="w-full text-left px-4 py-1 ui-label hover:bg-[var(--os-titlebar)] hover:text-white flex items-center gap-2"
+            >
+              {" "}
+              <Trash2 className="w-3 h-3" /> Delete
+            </button>
+          )}
         </div>
       )}
 
@@ -675,6 +1125,13 @@ const AsciiEditor: React.FC = () => {
                 </pre>
               </div>
               <div className="flex justify-end gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={downloadAscii}
+                  className="retro-button flex items-center gap-1"
+                >
+                  <Download className="w-3 h-3" /> Download .txt
+                </button>
                 <button
                   type="button"
                   onClick={() => navigator.clipboard.writeText(ascii)}
