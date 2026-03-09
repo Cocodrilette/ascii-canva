@@ -34,6 +34,7 @@ const AsciiEditor: React.FC = () => {
   ]);
   const [history, setHistory] = useState<BaseElement[][]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const isRemoteUpdate = useRef(false);
 
   const [isDragging, setIsDragging] = useState(false);
@@ -295,6 +296,23 @@ const AsciiEditor: React.FC = () => {
     setIsPanning(false);
     setCapturedIds([]);
   }, []);
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
+    const clickedEl = [...elements]
+      .sort((a, b) => (a.type === b.type ? 0 : a.type === "box" ? -1 : 1))
+      .reverse()
+      .find((el) => {
+        const ext = getExtension(el.type);
+        const b = ext.getBounds(el);
+        return gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom;
+      });
+
+    if (clickedEl?.type === "text") {
+      setSelectedId(clickedEl.id);
+      setIsEditing(true);
+    }
+  };
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -1059,10 +1077,36 @@ const AsciiEditor: React.FC = () => {
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
+        onDoubleClick={handleDoubleClick}
         onTouchStart={handleTouchStart}
         onContextMenu={handleContextMenu}
         className="w-full h-full block cursor-default"
       />
+
+      {isEditing && selectedElement?.type === "text" && (
+        <textarea
+          autoFocus
+          className="fixed z-[200] bg-white border-2 border-[var(--os-border-dark)] font-mono resize-none outline-none overflow-hidden shadow-[2px_2px_0_rgba(0,0,0,0.5)]"
+          style={{
+            left: selectedElement.x * visualCellSize + viewOffset.x,
+            top: selectedElement.y * visualCellSize + viewOffset.y,
+            width: Math.max(...(selectedElement as TextElement).text.split("\n").map(l => l.length), 1) * visualCellSize + 10,
+            height: (selectedElement as TextElement).text.split("\n").length * visualCellSize + 10,
+            fontSize: `${visualCellSize}px`,
+            lineHeight: `${visualCellSize}px`,
+            padding: "2px",
+          }}
+          value={(selectedElement as TextElement).text}
+          onChange={(e) => updateSelectedText(e.target.value)}
+          onBlur={() => setIsEditing(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setIsEditing(false);
+            }
+          }}
+        />
+      )}
+
       <div className="absolute top-4 left-4 window-raised flex flex-col z-50 min-w-[260px] shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
         <div className="title-bar cursor-default">
           <span className="flex items-center gap-2 font-bold">
@@ -1104,36 +1148,6 @@ const AsciiEditor: React.FC = () => {
           </div>
         </div>
         <div className="p-2 flex flex-col gap-2">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="text-content-input" className="ui-label">
-              Text Content
-            </label>
-            <div className="flex gap-1">
-              <textarea
-                id="text-content-input"
-                rows={3}
-                value={
-                  selectedElement?.type === "text"
-                    ? (selectedElement as TextElement).text
-                    : newText
-                }
-                onChange={(e) =>
-                  selectedElement?.type === "text"
-                    ? updateSelectedText(e.target.value)
-                    : setNewText(e.target.value)
-                }
-                placeholder="Enter text..."
-                className="retro-input flex-1 min-h-[60px] resize-none"
-                onKeyDown={(e) => {
-                   if (e.key === "Enter" && !e.shiftKey && !selectedId) {
-                      e.preventDefault();
-                      addExtensionElement("text");
-                   }
-                }}
-              />
-            </div>
-          </div>
-
           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[var(--os-border-dark)] border-b border-[var(--os-border-light)] pb-2 relative">
             <div className="absolute -top-[1px] left-0 right-0 h-[1px] bg-[var(--os-border-light)]" />
             <div className="absolute -bottom-[1px] left-0 right-0 h-[1px] bg-[var(--os-border-dark)]" />
