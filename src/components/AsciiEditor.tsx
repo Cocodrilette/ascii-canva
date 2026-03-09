@@ -32,8 +32,20 @@ const AsciiEditor: React.FC = () => {
 	const [gridSize, setGridSize] = useState({ cols: 80, rows: 40 });
 	const [zoom, setZoom] = useState(1);
 	const [touchDist, setTouchDist] = useState<number | null>(null);
+	const [viewOffset, setViewOffset] = useState({ x: 0, y: 0 });
+	const [isPanning, setIsPanning] = useState(false);
+	const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
 	const visualCellSize = CELL_SIZE * zoom;
+
+	const getGridCoords = useCallback(
+		(clientX: number, clientY: number) => {
+			const x = Math.floor((clientX - viewOffset.x) / visualCellSize);
+			const y = Math.floor((clientY - viewOffset.y) / visualCellSize);
+			return { x, y };
+		},
+		[viewOffset, visualCellSize],
+	);
 
 	// Handle window resize to fill screen
 	useEffect(() => {
@@ -48,13 +60,18 @@ const AsciiEditor: React.FC = () => {
 		return () => window.removeEventListener("resize", handleResize);
 	}, [visualCellSize]);
 
-	// Handle zoom with Ctrl + Scroll
+	// Handle zoom with Ctrl + Scroll and Pan with Scroll
 	useEffect(() => {
 		const handleWheel = (e: WheelEvent) => {
 			if (e.ctrlKey) {
 				e.preventDefault();
 				const delta = e.deltaY > 0 ? -0.1 : 0.1;
 				setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev + delta)));
+			} else {
+				setViewOffset((prev) => ({
+					x: prev.x - e.deltaX,
+					y: prev.y - e.deltaY,
+				}));
 			}
 		};
 
@@ -77,19 +94,30 @@ const AsciiEditor: React.FC = () => {
 		ctx.fillStyle = "#ffffff";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+		// Apply View Offset
+		ctx.save();
+		ctx.translate(viewOffset.x, viewOffset.y);
+
 		// Grid Lines
 		ctx.strokeStyle = "rgba(0,0,0,0.03)";
 		ctx.lineWidth = 1;
-		for (let i = 0; i <= gridSize.cols; i++) {
+
+		// Determine visible range to draw only what's on screen (infinite feel)
+		const startCol = Math.floor(-viewOffset.x / visualCellSize);
+		const endCol = startCol + Math.ceil(canvas.width / visualCellSize) + 1;
+		const startRow = Math.floor(-viewOffset.y / visualCellSize);
+		const endRow = startRow + Math.ceil(canvas.height / visualCellSize) + 1;
+
+		for (let i = startCol; i <= endCol; i++) {
 			ctx.beginPath();
-			ctx.moveTo(i * visualCellSize, 0);
-			ctx.lineTo(i * visualCellSize, canvas.height);
+			ctx.moveTo(i * visualCellSize, startRow * visualCellSize);
+			ctx.lineTo(i * visualCellSize, endRow * visualCellSize);
 			ctx.stroke();
 		}
-		for (let j = 0; j <= gridSize.rows; j++) {
+		for (let j = startRow; j <= endRow; j++) {
 			ctx.beginPath();
-			ctx.moveTo(0, j * visualCellSize);
-			ctx.lineTo(canvas.width, j * visualCellSize);
+			ctx.moveTo(startCol * visualCellSize, j * visualCellSize);
+			ctx.lineTo(endCol * visualCellSize, j * visualCellSize);
 			ctx.stroke();
 		}
 
@@ -124,19 +152,19 @@ const AsciiEditor: React.FC = () => {
 			}
 		}
 
+		ctx.restore();
 		ctx.shadowColor = "transparent";
 		ctx.shadowBlur = 0;
 		ctx.shadowOffsetX = 0;
 		ctx.shadowOffsetY = 0;
-	}, [elements, selectedId, gridSize, visualCellSize, zoom]);
+	}, [elements, selectedId, visualCellSize, zoom, viewOffset]);
 
 	useEffect(() => {
 		draw();
 	}, [draw]);
 
 	const handleMouseDown = (e: React.MouseEvent) => {
-		const gridX = Math.floor(e.clientX / visualCellSize);
-		const gridY = Math.floor(e.clientY / visualCellSize);
+		const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
 
 		const clickedEl = [...elements]
 			.reverse()
@@ -148,33 +176,38 @@ const AsciiEditor: React.FC = () => {
 			setDragOffset({ x: gridX - clickedEl.x, y: gridY - clickedEl.y });
 		} else {
 			setSelectedId(null);
+			setIsPanning(true);
+			setPanStart({ x: e.clientX - viewOffset.x, y: e.clientY - viewOffset.y });
 		}
 	};
 
 	const handleMouseMove = (e: React.MouseEvent) => {
-		if (!isDragging || !selectedId) return;
-
-		const gridX = Math.floor(e.clientX / visualCellSize);
-		const gridY = Math.floor(e.clientY / visualCellSize);
-
-		const newX = gridX - dragOffset.x;
-		const newY = gridY - dragOffset.y;
-
-		setElements((prev) => prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)));
+		if (isDragging && selectedId) {
+			const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
+			const newX = gridX - dragOffset.x;
+			const newY = gridY - dragOffset.y;
+			setElements((prev) => prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)));
+		} else if (isPanning) {
+			setViewOffset({
+				x: e.clientX - panStart.x,
+				y: e.clientY - panStart.y,
+			});
+		}
 	};
 
-	const handleMouseUp = () => setIsDragging(false);
+	const handleMouseUp = () => {
+		setIsDragging(false);
+		setIsPanning(false);
+	};
 
-	// Touch Handlers for Mobile (Pinch to Zoom)
+	// Touch Handlers for Mobile (Pinch to Zoom + Panning)
 	const handleTouchStart = (e: React.TouchEvent) => {
 		if (e.touches.length === 2) {
 			const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
 			setTouchDist(dist);
 		} else if (e.touches.length === 1) {
-			// Reuse mouse logic for single touch drag
 			const touch = e.touches[0];
-			const gridX = Math.floor(touch.clientX / visualCellSize);
-			const gridY = Math.floor(touch.clientY / visualCellSize);
+			const { x: gridX, y: gridY } = getGridCoords(touch.clientX, touch.clientY);
 
 			const clickedEl = [...elements]
 				.reverse()
@@ -184,6 +217,10 @@ const AsciiEditor: React.FC = () => {
 				setSelectedId(clickedEl.id);
 				setIsDragging(true);
 				setDragOffset({ x: gridX - clickedEl.x, y: gridY - clickedEl.y });
+			} else {
+				setSelectedId(null);
+				setIsPanning(true);
+				setPanStart({ x: touch.clientX - viewOffset.x, y: touch.clientY - viewOffset.y });
 			}
 		}
 	};
@@ -194,21 +231,26 @@ const AsciiEditor: React.FC = () => {
 			const delta = dist / touchDist;
 			setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev * delta)));
 			setTouchDist(dist);
-		} else if (e.touches.length === 1 && isDragging && selectedId) {
+		} else if (e.touches.length === 1) {
 			const touch = e.touches[0];
-			const gridX = Math.floor(touch.clientX / visualCellSize);
-			const gridY = Math.floor(touch.clientY / visualCellSize);
-
-			const newX = gridX - dragOffset.x;
-			const newY = gridY - dragOffset.y;
-
-			setElements((prev) => prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)));
+			if (isDragging && selectedId) {
+				const { x: gridX, y: gridY } = getGridCoords(touch.clientX, touch.clientY);
+				const newX = gridX - dragOffset.x;
+				const newY = gridY - dragOffset.y;
+				setElements((prev) => prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)));
+			} else if (isPanning) {
+				setViewOffset({
+					x: touch.clientX - panStart.x,
+					y: touch.clientY - panStart.y,
+				});
+			}
 		}
 	};
 
 	const handleTouchEnd = () => {
 		setTouchDist(null);
 		setIsDragging(false);
+		setIsPanning(false);
 	};
 
 	const addElement = () => {
@@ -216,8 +258,8 @@ const AsciiEditor: React.FC = () => {
 		const newEl: TextElement = {
 			id: Math.random().toString(36).substr(2, 9),
 			text: newText,
-			x: Math.floor(gridSize.cols / 2) - Math.floor(newText.length / 2),
-			y: Math.floor(gridSize.rows / 2),
+			x: Math.floor((window.innerWidth / 2 - viewOffset.x) / visualCellSize) - Math.floor(newText.length / 2),
+			y: Math.floor((window.innerHeight / 2 - viewOffset.y) / visualCellSize),
 		};
 		setElements([...elements, newEl]);
 		setNewText("");
@@ -231,15 +273,26 @@ const AsciiEditor: React.FC = () => {
 	};
 
 	const generateAscii = () => {
-		const grid: string[][] = Array.from({ length: gridSize.rows }, () =>
-			Array.from({ length: gridSize.cols }, () => " "),
+		// To export precisely, we find the bounds of our elements
+		if (elements.length === 0) return;
+
+		const minX = Math.min(...elements.map((el) => el.x));
+		const maxX = Math.max(...elements.map((el) => el.x + el.text.length));
+		const minY = Math.min(...elements.map((el) => el.y));
+		const maxY = Math.max(...elements.map((el) => el.y));
+
+		const width = maxX - minX;
+		const height = maxY - minY + 1;
+
+		const grid: string[][] = Array.from({ length: height }, () =>
+			Array.from({ length: width }, () => " "),
 		);
 
 		for (const el of elements) {
 			for (let i = 0; i < el.text.length; i++) {
-				const x = el.x + i;
-				const y = el.y;
-				if (x >= 0 && x < gridSize.cols && y >= 0 && y < gridSize.rows) {
+				const x = el.x - minX + i;
+				const y = el.y - minY;
+				if (x >= 0 && x < width && y >= 0 && y < height) {
 					grid[y][x] = el.text[i];
 				}
 			}
