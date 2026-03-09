@@ -60,26 +60,6 @@ const AsciiEditor: React.FC = () => {
 		return () => window.removeEventListener("resize", handleResize);
 	}, [visualCellSize]);
 
-	// Handle zoom with Ctrl + Scroll and Pan with Scroll
-	useEffect(() => {
-		const handleWheel = (e: WheelEvent) => {
-			if (e.ctrlKey) {
-				e.preventDefault();
-				const delta = e.deltaY > 0 ? -0.1 : 0.1;
-				setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev + delta)));
-			} else {
-				setViewOffset((prev) => ({
-					x: prev.x - e.deltaX,
-					y: prev.y - e.deltaY,
-				}));
-			}
-		};
-
-		const canvas = canvasRef.current;
-		canvas?.addEventListener("wheel", handleWheel, { passive: false });
-		return () => canvas?.removeEventListener("wheel", handleWheel);
-	}, []);
-
 	const draw = useCallback(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
@@ -163,6 +143,63 @@ const AsciiEditor: React.FC = () => {
 		draw();
 	}, [draw]);
 
+	const handleMouseUp = useCallback(() => {
+		setIsDragging(false);
+		setIsPanning(false);
+	}, []);
+
+	const handleMouseMove = useCallback(
+		(e: MouseEvent) => {
+			if (isDragging && selectedId) {
+				const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
+				const newX = gridX - dragOffset.x;
+				const newY = gridY - dragOffset.y;
+				setElements((prev) =>
+					prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)),
+				);
+			} else if (isPanning) {
+				setViewOffset({
+					x: e.clientX - panStart.x,
+					y: e.clientY - panStart.y,
+				});
+			}
+		},
+		[isDragging, isPanning, selectedId, getGridCoords, dragOffset, panStart],
+	);
+
+	const handleWheel = useCallback(
+		(e: WheelEvent) => {
+			if (e.ctrlKey) {
+				e.preventDefault();
+				const delta = e.deltaY > 0 ? -0.1 : 0.1;
+				setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev + delta)));
+			} else {
+				setViewOffset((prev) => ({
+					x: prev.x - e.deltaX,
+					y: prev.y - e.deltaY,
+				}));
+			}
+		},
+		[],
+	);
+
+	// Desktop Global Listeners
+	useEffect(() => {
+		const canvas = canvasRef.current;
+		canvas?.addEventListener("wheel", handleWheel, { passive: false });
+		
+		if (isDragging || isPanning) {
+			window.addEventListener("mousemove", handleMouseMove);
+			window.addEventListener("mouseup", handleMouseUp);
+		}
+		
+		return () => {
+			canvas?.removeEventListener("wheel", handleWheel);
+			window.removeEventListener("mousemove", handleMouseMove);
+			window.removeEventListener("mouseup", handleMouseUp);
+		};
+	}, [isDragging, isPanning, handleMouseMove, handleMouseUp, handleWheel]);
+
 	const handleMouseDown = (e: React.MouseEvent) => {
 		const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
 
@@ -181,29 +218,61 @@ const AsciiEditor: React.FC = () => {
 		}
 	};
 
-	const handleMouseMove = (e: React.MouseEvent) => {
-		if (isDragging && selectedId) {
-			const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
-			const newX = gridX - dragOffset.x;
-			const newY = gridY - dragOffset.y;
-			setElements((prev) => prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)));
-		} else if (isPanning) {
-			setViewOffset({
-				x: e.clientX - panStart.x,
-				y: e.clientY - panStart.y,
-			});
-		}
-	};
-
-	const handleMouseUp = () => {
+	// Touch Handlers for Mobile
+	const handleTouchEnd = useCallback(() => {
+		setTouchDist(null);
 		setIsDragging(false);
 		setIsPanning(false);
-	};
+	}, []);
 
-	// Touch Handlers for Mobile (Pinch to Zoom + Panning)
+	const handleTouchMove = useCallback(
+		(e: TouchEvent) => {
+			if (e.touches.length === 2 && touchDist !== null) {
+				const dist = Math.hypot(
+					e.touches[0].pageX - e.touches[1].pageX,
+					e.touches[0].pageY - e.touches[1].pageY,
+				);
+				const delta = dist / touchDist;
+				setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev * delta)));
+				setTouchDist(dist);
+			} else if (e.touches.length === 1) {
+				const touch = e.touches[0];
+				if (isDragging && selectedId) {
+					const { x: gridX, y: gridY } = getGridCoords(touch.clientX, touch.clientY);
+					const newX = gridX - dragOffset.x;
+					const newY = gridY - dragOffset.y;
+					setElements((prev) =>
+						prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)),
+					);
+				} else if (isPanning) {
+					setViewOffset({
+						x: touch.clientX - panStart.x,
+						y: touch.clientY - panStart.y,
+					});
+				}
+			}
+		},
+		[touchDist, isDragging, selectedId, getGridCoords, dragOffset, isPanning, panStart],
+	);
+
+	// Mobile Global Listeners
+	useEffect(() => {
+		if (isDragging || isPanning || touchDist !== null) {
+			window.addEventListener("touchmove", handleTouchMove, { passive: false });
+			window.addEventListener("touchend", handleTouchEnd);
+		}
+		return () => {
+			window.removeEventListener("touchmove", handleTouchMove);
+			window.removeEventListener("touchend", handleTouchEnd);
+		};
+	}, [isDragging, isPanning, touchDist, handleTouchMove, handleTouchEnd]);
+
 	const handleTouchStart = (e: React.TouchEvent) => {
 		if (e.touches.length === 2) {
-			const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+			const dist = Math.hypot(
+				e.touches[0].pageX - e.touches[1].pageX,
+				e.touches[0].pageY - e.touches[1].pageY,
+			);
 			setTouchDist(dist);
 		} else if (e.touches.length === 1) {
 			const touch = e.touches[0];
@@ -223,34 +292,6 @@ const AsciiEditor: React.FC = () => {
 				setPanStart({ x: touch.clientX - viewOffset.x, y: touch.clientY - viewOffset.y });
 			}
 		}
-	};
-
-	const handleTouchMove = (e: React.TouchEvent) => {
-		if (e.touches.length === 2 && touchDist !== null) {
-			const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-			const delta = dist / touchDist;
-			setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev * delta)));
-			setTouchDist(dist);
-		} else if (e.touches.length === 1) {
-			const touch = e.touches[0];
-			if (isDragging && selectedId) {
-				const { x: gridX, y: gridY } = getGridCoords(touch.clientX, touch.clientY);
-				const newX = gridX - dragOffset.x;
-				const newY = gridY - dragOffset.y;
-				setElements((prev) => prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)));
-			} else if (isPanning) {
-				setViewOffset({
-					x: touch.clientX - panStart.x,
-					y: touch.clientY - panStart.y,
-				});
-			}
-		}
-	};
-
-	const handleTouchEnd = () => {
-		setTouchDist(null);
-		setIsDragging(false);
-		setIsPanning(false);
 	};
 
 	const addElement = () => {
@@ -273,7 +314,6 @@ const AsciiEditor: React.FC = () => {
 	};
 
 	const generateAscii = () => {
-		// To export precisely, we find the bounds of our elements
 		if (elements.length === 0) return;
 
 		const minX = Math.min(...elements.map((el) => el.x));
@@ -307,12 +347,7 @@ const AsciiEditor: React.FC = () => {
 			<canvas
 				ref={canvasRef}
 				onMouseDown={handleMouseDown}
-				onMouseMove={handleMouseMove}
-				onMouseUp={handleMouseUp}
-				onMouseLeave={handleMouseUp}
 				onTouchStart={handleTouchStart}
-				onTouchMove={handleTouchMove}
-				onTouchEnd={handleTouchEnd}
 				className="w-full h-full block cursor-crosshair"
 			/>
 
