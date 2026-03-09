@@ -1,5 +1,13 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
 
+## Documentation
+
+The project includes a comprehensive guide for the **Extension System**. This allows developers to create custom drawing primitives (like circles, icons, etc.) that work with the ASCII rendering engine and P2P synchronization.
+
+Access the docs locally at: [http://localhost:3000/docs](http://localhost:3000/docs)
+
+---
+
 ## Getting Started
 
 First, run the development server:
