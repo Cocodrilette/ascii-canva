@@ -106,12 +106,13 @@ const AsciiEditor: React.FC = () => {
 			ctx.lineTo(i * visualCellSize, endRow * visualCellSize);
 		}
 		for (let j = startRow; j <= endRow; j++) {
+			ctx.beginPath();
 			ctx.moveTo(startCol * visualCellSize, j * visualCellSize);
 			ctx.lineTo(endCol * visualCellSize, j * visualCellSize);
 		}
 		ctx.stroke();
 
-		// Spatial Culling
+		// Spatial Culling + Rendering Order (Boxes then Text)
 		const visibleElements = elements.filter(el => {
 			const b = getElementBounds(el);
 			const screenX = b.left * visualCellSize + viewOffset.x;
@@ -121,10 +122,15 @@ const AsciiEditor: React.FC = () => {
 			return screenX + screenW > 0 && screenX < canvas.width && screenY + screenH > 0 && screenY < canvas.height;
 		});
 
+		const sortedElements = [...visibleElements].sort((a, b) => {
+			if (a.type === b.type) return 0;
+			return a.type === "box" ? -1 : 1;
+		});
+
 		ctx.font = `${visualCellSize}px monospace`;
 		ctx.textBaseline = "top";
 
-		for (const el of visibleElements) {
+		for (const el of sortedElements) {
 			const isSelected = el.id === selectedId;
 			const b = getElementBounds(el);
 
@@ -195,11 +201,7 @@ const AsciiEditor: React.FC = () => {
 						if (children.length > 0) {
 							const minR = Math.max(...children.map(c => getElementBounds(c).right));
 							const minB = Math.max(...children.map(c => getElementBounds(c).bottom));
-							return {
-								...el,
-								width: Math.max(newWidth, minR - el.x),
-								height: Math.max(newHeight, minB - el.y)
-							};
+							return { ...el, width: Math.max(newWidth, minR - el.x), height: Math.max(newHeight, minB - el.y) };
 						}
 						return { ...el, width: newWidth, height: newHeight };
 					}
@@ -302,6 +304,7 @@ const AsciiEditor: React.FC = () => {
 	const handleMouseDown = (e: React.MouseEvent) => {
 		const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
 		const selected = elements.find(el => el.id === selectedId);
+		
 		if (selected?.type === "box") {
 			const handleX = (selected.x + selected.width) * visualCellSize + viewOffset.x;
 			const handleY = (selected.y + selected.height) * visualCellSize + viewOffset.y;
@@ -310,10 +313,22 @@ const AsciiEditor: React.FC = () => {
 				return;
 			}
 		}
-		const clickedEl = [...elements].reverse().find(el => {
+
+		// Prioritize Text Selection
+		const clickedText = [...elements].reverse().find(el => {
+			if (el.type !== "text") return false;
 			const b = getElementBounds(el);
 			return gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom;
 		});
+
+		const clickedBox = [...elements].reverse().find(el => {
+			if (el.type !== "box") return false;
+			const b = getElementBounds(el);
+			return gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom;
+		});
+
+		const clickedEl = clickedText || clickedBox;
+
 		if (clickedEl) {
 			setSelectedId(clickedEl.id);
 			setIsDragging(true);
@@ -321,6 +336,8 @@ const AsciiEditor: React.FC = () => {
 			if (clickedEl.type === "box") {
 				const children = elements.filter(el => isInside(el, clickedEl as BoxElement));
 				setCapturedIds(children.map(c => c.id));
+			} else {
+				setCapturedIds([]); // Ensure moving text doesn't move box
 			}
 		} else {
 			setSelectedId(null);
@@ -345,10 +362,17 @@ const AsciiEditor: React.FC = () => {
 					return;
 				}
 			}
-			const clickedEl = [...elements].reverse().find(el => {
+			const clickedText = [...elements].reverse().find(el => {
+				if (el.type !== "text") return false;
 				const b = getElementBounds(el);
 				return gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom;
 			});
+			const clickedBox = [...elements].reverse().find(el => {
+				if (el.type !== "box") return false;
+				const b = getElementBounds(el);
+				return gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom;
+			});
+			const clickedEl = clickedText || clickedBox;
 			if (clickedEl) {
 				setSelectedId(clickedEl.id);
 				setIsDragging(true);
@@ -356,6 +380,8 @@ const AsciiEditor: React.FC = () => {
 				if (clickedEl.type === "box") {
 					const children = elements.filter(el => isInside(el, clickedEl as BoxElement));
 					setCapturedIds(children.map(c => c.id));
+				} else {
+					setCapturedIds([]);
 				}
 			} else {
 				setSelectedId(null);
@@ -366,17 +392,21 @@ const AsciiEditor: React.FC = () => {
 	};
 
 	const addText = () => {
-		if (!newText.trim()) return;
+		const textToAdd = newText.trim() || "NEW TEXT";
 		const newEl: TextElement = {
 			id: Math.random().toString(36).substr(2, 9),
 			type: "text",
-			text: newText,
-			x: Math.floor((window.innerWidth / 2 - viewOffset.x) / visualCellSize) - Math.floor(newText.length / 2),
+			text: textToAdd,
+			x: Math.floor((window.innerWidth / 2 - viewOffset.x) / visualCellSize) - Math.floor(textToAdd.length / 2),
 			y: Math.floor((window.innerHeight / 2 - viewOffset.y) / visualCellSize),
 		};
 		setElements([...elements, newEl]);
 		setNewText("");
 		setSelectedId(newEl.id);
+	};
+
+	const updateSelectedText = (text: string) => {
+		setElements(prev => prev.map(el => el.id === selectedId && el.type === "text" ? { ...el, text } : el));
 	};
 
 	const addBox = () => {
@@ -440,6 +470,8 @@ const AsciiEditor: React.FC = () => {
 		setShowAscii(true);
 	};
 
+	const selectedElement = elements.find(el => el.id === selectedId);
+
 	return (
 		<div className="fixed inset-0 overflow-hidden bg-white select-none">
 			<canvas ref={canvasRef} onMouseDown={handleMouseDown} onTouchStart={handleTouchStart} className="w-full h-full block cursor-crosshair" />
@@ -452,15 +484,17 @@ const AsciiEditor: React.FC = () => {
 				<div className="flex items-center gap-2 pr-2 border-r border-black/5 dark:border-white/5">
 					<input
 						type="text"
-						value={newText}
-						onChange={(e) => setNewText(e.target.value)}
-						placeholder="Add text..."
+						value={selectedElement?.type === "text" ? selectedElement.text : newText}
+						onChange={(e) => selectedElement?.type === "text" ? updateSelectedText(e.target.value) : setNewText(e.target.value)}
+						placeholder={selectedId ? "Edit text..." : "Add text..."}
 						className="w-32 px-3 py-1.5 bg-black/5 dark:bg-white/5 rounded-lg focus:outline-none text-sm transition-all focus:w-48"
-						onKeyDown={(e) => e.key === "Enter" && addText()}
+						onKeyDown={(e) => e.key === "Enter" && !selectedId && addText()}
 					/>
-					<button type="button" onClick={addText} className="p-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:scale-105 transition-transform">
-						<Plus className="w-4 h-4" />
-					</button>
+					{!selectedId && (
+						<button type="button" onClick={addText} className="p-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:scale-105 transition-transform">
+							<Plus className="w-4 h-4" />
+						</button>
+					)}
 				</div>
 				<div className="flex items-center gap-2 pr-2 border-r border-black/5 dark:border-white/5">
 					<button type="button" onClick={addBox} className="p-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:scale-105 transition-transform" title="Add Container Box">
