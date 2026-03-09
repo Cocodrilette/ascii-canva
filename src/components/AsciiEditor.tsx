@@ -1,35 +1,49 @@
-import { Copy, Download, FileText, GripHorizontal, MousePointer2, Plus, Trash2, X } from "lucide-react";
+import { Copy, Download, FileText, GripHorizontal, MousePointer2, Plus, Square, Trash2, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { translateCanvasToAscii } from "../utils/ascii";
 
-interface TextElement {
+type ElementType = "text" | "box";
+
+interface BaseElement {
 	id: string;
-	text: string;
+	type: ElementType;
 	x: number; // grid x
 	y: number; // grid y
 }
+
+interface TextElement extends BaseElement {
+	type: "text";
+	text: string;
+}
+
+interface BoxElement extends BaseElement {
+	type: "box";
+	width: number;
+	height: number;
+}
+
+type EditorElement = TextElement | BoxElement;
 
 const CELL_SIZE = 14; // base visual size of a cell in pixels
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4.0;
 
-/**
- * Immersive Full-Screen Grid Canvas Editor
- */
 const AsciiEditor: React.FC = () => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const [elements, setElements] = useState<TextElement[]>([
-		{ id: "1", text: "GENESIS ASCII", x: 10, y: 10 },
-		{ id: "2", text: "DRAG ELEMENTS", x: 10, y: 12 },
+	const [elements, setElements] = useState<EditorElement[]>([
+		{ id: "1", type: "text", text: "GENESIS ASCII", x: 10, y: 10 },
+		{ id: "2", type: "box", x: 8, y: 8, width: 20, height: 6 },
 	]);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [isDragging, setIsDragging] = useState(false);
+	const [isResizing, setIsResizing] = useState(false);
 	const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+	const [capturedIds, setCapturedIds] = useState<string[]>([]);
+	
 	const [ascii, setAscii] = useState("");
 	const [showAscii, setShowAscii] = useState(false);
 	const [newText, setNewText] = useState("");
-	const [gridSize, setGridSize] = useState({ cols: 80, rows: 40 });
 	const [zoom, setZoom] = useState(1);
 	const [touchDist, setTouchDist] = useState<number | null>(null);
 	const [viewOffset, setViewOffset] = useState({ x: 0, y: 0 });
@@ -47,44 +61,40 @@ const AsciiEditor: React.FC = () => {
 		[viewOffset, visualCellSize],
 	);
 
-	// Handle window resize to fill screen
-	useEffect(() => {
-		const handleResize = () => {
-			const cols = Math.floor(window.innerWidth / visualCellSize);
-			const rows = Math.floor(window.innerHeight / visualCellSize);
-			setGridSize({ cols, rows });
-		};
+	const getElementBounds = (el: EditorElement) => {
+		if (el.type === "text") {
+			return { left: el.x, top: el.y, right: el.x + el.text.length, bottom: el.y + 1 };
+		}
+		return { left: el.x, top: el.y, right: el.x + el.width, bottom: el.y + el.height };
+	};
 
-		handleResize();
-		window.addEventListener("resize", handleResize);
-		return () => window.removeEventListener("resize", handleResize);
-	}, [visualCellSize]);
+	const isInside = (child: EditorElement, parent: BoxElement) => {
+		if (child.id === parent.id) return false;
+		const cb = getElementBounds(child);
+		const pb = getElementBounds(parent);
+		return cb.left >= pb.left && cb.right <= pb.right && cb.top >= pb.top && cb.bottom <= pb.bottom;
+	};
 
 	const draw = useCallback(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
-		const ctx = canvas.getContext("2d", { alpha: false }); // Optimization: opaque canvas
+		const ctx = canvas.getContext("2d", { alpha: false });
 		if (!ctx) return;
 
-		// Set canvas size to match window
 		if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
 			canvas.width = window.innerWidth;
 			canvas.height = window.innerHeight;
 		}
 
-		// Background
 		ctx.fillStyle = "#ffffff";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-		// Apply View Offset
 		ctx.save();
 		ctx.translate(viewOffset.x, viewOffset.y);
 
-		// --- OPTIMIZED GRID DRAWING ---
-		// We use a simpler approach: only draw visible lines
+		// Grid
 		ctx.strokeStyle = "rgba(0,0,0,0.03)";
 		ctx.lineWidth = 1;
-		
 		const startCol = Math.floor(-viewOffset.x / visualCellSize);
 		const endCol = startCol + Math.ceil(canvas.width / visualCellSize) + 1;
 		const startRow = Math.floor(-viewOffset.y / visualCellSize);
@@ -101,143 +111,173 @@ const AsciiEditor: React.FC = () => {
 		}
 		ctx.stroke();
 
-		// --- SPATIAL CULLING ---
-		// Only draw elements that are within or overlap the viewport
+		// Spatial Culling
 		const visibleElements = elements.filter(el => {
-			const elWidth = el.text.length * visualCellSize;
-			const screenX = el.x * visualCellSize + viewOffset.x;
-			const screenY = el.y * visualCellSize + viewOffset.y;
-			
-			return (
-				screenX + elWidth > 0 &&
-				screenX < canvas.width &&
-				screenY + visualCellSize > 0 &&
-				screenY < canvas.height
-			);
+			const b = getElementBounds(el);
+			const screenX = b.left * visualCellSize + viewOffset.x;
+			const screenY = b.top * visualCellSize + viewOffset.y;
+			const screenW = (b.right - b.left) * visualCellSize;
+			const screenH = (b.bottom - b.top) * visualCellSize;
+			return screenX + screenW > 0 && screenX < canvas.width && screenY + screenH > 0 && screenY < canvas.height;
 		});
 
-		// Draw Elements
 		ctx.font = `${visualCellSize}px monospace`;
 		ctx.textBaseline = "top";
 
 		for (const el of visibleElements) {
 			const isSelected = el.id === selectedId;
+			const b = getElementBounds(el);
 
 			if (isSelected) {
 				ctx.shadowColor = "transparent";
 				ctx.shadowBlur = 0;
 				ctx.shadowOffsetX = 0;
 				ctx.shadowOffsetY = 0;
-
 				ctx.fillStyle = "rgba(0, 102, 255, 0.05)";
-				ctx.fillRect(el.x * visualCellSize, el.y * visualCellSize, el.text.length * visualCellSize, visualCellSize);
+				ctx.fillRect(el.x * visualCellSize, el.y * visualCellSize, (b.right - b.left) * visualCellSize, (b.bottom - b.top) * visualCellSize);
 				ctx.strokeStyle = "rgba(0, 102, 255, 0.2)";
-				ctx.strokeRect(el.x * visualCellSize, el.y * visualCellSize, el.text.length * visualCellSize, visualCellSize);
+				ctx.strokeRect(el.x * visualCellSize, el.y * visualCellSize, (b.right - b.left) * visualCellSize, (b.bottom - b.top) * visualCellSize);
 			}
 
-			// Subtle shadow for text elements
 			ctx.shadowColor = "rgba(0, 0, 0, 0.05)";
 			ctx.shadowBlur = 4 * zoom;
 			ctx.shadowOffsetX = 2 * zoom;
 			ctx.shadowOffsetY = 2 * zoom;
 
-			ctx.fillStyle = isSelected ? "#0066ff" : "#18181b";
-			// Performance: use fillText for the whole string if possible, 
-			// but we need exact grid alignment so we still do char-by-char.
-			// However, monospace font at exact sizes usually aligns well.
-			for (let i = 0; i < el.text.length; i++) {
-				ctx.fillText(el.text[i], (el.x + i) * visualCellSize + visualCellSize * 0.15, el.y * visualCellSize);
+			if (el.type === "text") {
+				ctx.fillStyle = isSelected ? "#0066ff" : "#18181b";
+				for (let i = 0; i < el.text.length; i++) {
+					ctx.fillText(el.text[i], (el.x + i) * visualCellSize + visualCellSize * 0.15, el.y * visualCellSize);
+				}
+			} else if (el.type === "box") {
+				ctx.strokeStyle = isSelected ? "#0066ff" : "#18181b";
+				ctx.lineWidth = 2 * zoom;
+				ctx.strokeRect(el.x * visualCellSize + 2, el.y * visualCellSize + 2, el.width * visualCellSize - 4, el.height * visualCellSize - 4);
+				
+				// Resize handle
+				if (isSelected) {
+					ctx.fillStyle = "#0066ff";
+					ctx.fillRect((el.x + el.width) * visualCellSize - 6, (el.y + el.height) * visualCellSize - 6, 12, 12);
+				}
 			}
 		}
 
 		ctx.restore();
 		ctx.shadowColor = "transparent";
-		ctx.shadowBlur = 0;
 	}, [elements, selectedId, visualCellSize, zoom, viewOffset]);
 
-	// Use RequestAnimationFrame for smooth rendering
 	useEffect(() => {
 		let animationFrameId: number;
-
 		const render = () => {
 			draw();
 			animationFrameId = window.requestAnimationFrame(render);
 		};
-
 		animationFrameId = window.requestAnimationFrame(render);
-		return () => {
-			window.cancelAnimationFrame(animationFrameId);
-		};
+		return () => window.cancelAnimationFrame(animationFrameId);
 	}, [draw]);
 
 	const handleMouseUp = useCallback(() => {
 		setIsDragging(false);
-		setIsPanning(false);
+		setIsResizing(false);
+		setCapturedIds([]);
 	}, []);
 
 	const handleMouseMove = useCallback(
 		(e: MouseEvent) => {
-			if (isDragging && selectedId) {
-				const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
-				const newX = gridX - dragOffset.x;
-				const newY = gridY - dragOffset.y;
-				setElements((prev) =>
-					prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)),
-				);
-			} else if (isPanning) {
-				setViewOffset({
-					x: e.clientX - panStart.x,
-					y: e.clientY - panStart.y,
-				});
-			}
-		},
-		[isDragging, isPanning, selectedId, getGridCoords, dragOffset, panStart],
-	);
+			const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
 
-	const handleWheel = useCallback(
-		(e: WheelEvent) => {
-			if (e.ctrlKey) {
-				e.preventDefault();
-				const delta = e.deltaY > 0 ? -0.1 : 0.1;
-				setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev + delta)));
-			} else {
-				setViewOffset((prev) => ({
-					x: prev.x - e.deltaX,
-					y: prev.y - e.deltaY,
+			if (isResizing && selectedId) {
+				setElements(prev => prev.map(el => {
+					if (el.id === selectedId && el.type === "box") {
+						const newWidth = Math.max(2, gridX - el.x + 1);
+						const newHeight = Math.max(2, gridY - el.y + 1);
+						
+						// Check if new size contains all current children
+						const children = prev.filter(child => isInside(child, el as BoxElement));
+						if (children.length > 0) {
+							const minR = Math.max(...children.map(c => getElementBounds(c).right));
+							const minB = Math.max(...children.map(c => getElementBounds(c).bottom));
+							return {
+								...el,
+								width: Math.max(newWidth, minR - el.x),
+								height: Math.max(newHeight, minB - el.y)
+							};
+						}
+						return { ...el, width: newWidth, height: newHeight };
+					}
+					return el;
 				}));
+			} else if (isDragging && selectedId) {
+				const dx = gridX - dragOffset.x;
+				const dy = gridY - dragOffset.y;
+				
+				setElements(prev => prev.map(el => {
+					if (el.id === selectedId || capturedIds.includes(el.id)) {
+						return { ...el, x: el.x + dx, y: el.y + dy };
+					}
+					return el;
+				}));
+				setDragOffset({ x: gridX, y: gridY });
+			} else if (isPanning) {
+				setViewOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
 			}
 		},
-		[],
+		[isDragging, isResizing, isPanning, selectedId, getGridCoords, dragOffset, panStart, capturedIds],
 	);
 
-	// Desktop Global Listeners
+	const handleWheel = useCallback((e: WheelEvent) => {
+		if (e.ctrlKey) {
+			e.preventDefault();
+			const delta = e.deltaY > 0 ? -0.1 : 0.1;
+			setZoom(prev => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev + delta)));
+		} else {
+			setViewOffset(prev => ({ x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
+		}
+	}, []);
+
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		canvas?.addEventListener("wheel", handleWheel, { passive: false });
-		
-		if (isDragging || isPanning) {
+		if (isDragging || isPanning || isResizing) {
 			window.addEventListener("mousemove", handleMouseMove);
 			window.addEventListener("mouseup", handleMouseUp);
 		}
-		
 		return () => {
 			canvas?.removeEventListener("wheel", handleWheel);
 			window.removeEventListener("mousemove", handleMouseMove);
 			window.removeEventListener("mouseup", handleMouseUp);
 		};
-	}, [isDragging, isPanning, handleMouseMove, handleMouseUp, handleWheel]);
+	}, [isDragging, isPanning, isResizing, handleMouseMove, handleMouseUp, handleWheel]);
 
 	const handleMouseDown = (e: React.MouseEvent) => {
 		const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
 
-		const clickedEl = [...elements]
-			.reverse()
-			.find((el) => gridY === el.y && gridX >= el.x && gridX < el.x + el.text.length);
+		// Check for resize handle first if a box is selected
+		const selected = elements.find(el => el.id === selectedId);
+		if (selected?.type === "box") {
+			const handleX = (selected.x + selected.width) * visualCellSize + viewOffset.x;
+			const handleY = (selected.y + selected.height) * visualCellSize + viewOffset.y;
+			if (Math.abs(e.clientX - handleX) < 15 && Math.abs(e.clientY - handleY) < 15) {
+				setIsResizing(true);
+				return;
+			}
+		}
+
+		const clickedEl = [...elements].reverse().find(el => {
+			const b = getElementBounds(el);
+			return gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom;
+		});
 
 		if (clickedEl) {
 			setSelectedId(clickedEl.id);
 			setIsDragging(true);
-			setDragOffset({ x: gridX - clickedEl.x, y: gridY - clickedEl.y });
+			setDragOffset({ x: gridX, y: gridY });
+			
+			// Auto-grouping: if it's a box, capture children
+			if (clickedEl.type === "box") {
+				const children = elements.filter(el => isInside(el, clickedEl as BoxElement));
+				setCapturedIds(children.map(c => c.id));
+			}
 		} else {
 			setSelectedId(null);
 			setIsPanning(true);
@@ -245,86 +285,11 @@ const AsciiEditor: React.FC = () => {
 		}
 	};
 
-	// Touch Handlers for Mobile
-	const handleTouchEnd = useCallback(() => {
-		setTouchDist(null);
-		setIsDragging(false);
-		setIsPanning(false);
-	}, []);
-
-	const handleTouchMove = useCallback(
-		(e: TouchEvent) => {
-			if (e.touches.length === 2 && touchDist !== null) {
-				const dist = Math.hypot(
-					e.touches[0].pageX - e.touches[1].pageX,
-					e.touches[0].pageY - e.touches[1].pageY,
-				);
-				const delta = dist / touchDist;
-				setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev * delta)));
-				setTouchDist(dist);
-			} else if (e.touches.length === 1) {
-				const touch = e.touches[0];
-				if (isDragging && selectedId) {
-					const { x: gridX, y: gridY } = getGridCoords(touch.clientX, touch.clientY);
-					const newX = gridX - dragOffset.x;
-					const newY = gridY - dragOffset.y;
-					setElements((prev) =>
-						prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)),
-					);
-				} else if (isPanning) {
-					setViewOffset({
-						x: touch.clientX - panStart.x,
-						y: touch.clientY - panStart.y,
-					});
-				}
-			}
-		},
-		[touchDist, isDragging, selectedId, getGridCoords, dragOffset, isPanning, panStart],
-	);
-
-	// Mobile Global Listeners
-	useEffect(() => {
-		if (isDragging || isPanning || touchDist !== null) {
-			window.addEventListener("touchmove", handleTouchMove, { passive: false });
-			window.addEventListener("touchend", handleTouchEnd);
-		}
-		return () => {
-			window.removeEventListener("touchmove", handleTouchMove);
-			window.removeEventListener("touchend", handleTouchEnd);
-		};
-	}, [isDragging, isPanning, touchDist, handleTouchMove, handleTouchEnd]);
-
-	const handleTouchStart = (e: React.TouchEvent) => {
-		if (e.touches.length === 2) {
-			const dist = Math.hypot(
-				e.touches[0].pageX - e.touches[1].pageX,
-				e.touches[0].pageY - e.touches[1].pageY,
-			);
-			setTouchDist(dist);
-		} else if (e.touches.length === 1) {
-			const touch = e.touches[0];
-			const { x: gridX, y: gridY } = getGridCoords(touch.clientX, touch.clientY);
-
-			const clickedEl = [...elements]
-				.reverse()
-				.find((el) => gridY === el.y && gridX >= el.x && gridX < el.x + el.text.length);
-
-			if (clickedEl) {
-				setSelectedId(clickedEl.id);
-				setIsDragging(true);
-				setDragOffset({ x: gridX - clickedEl.x, y: gridY - clickedEl.y });
-			} else {
-				setSelectedId(null);
-				setIsPanning(true);
-				setPanStart({ x: touch.clientX - viewOffset.x, y: touch.clientY - viewOffset.y });
-			}
-		}
-	};
-
-	const addElement = () => {
+	const addText = () => {
 		if (!newText.trim()) return;
 		const newEl: TextElement = {
 			id: Math.random().toString(36).substr(2, 9),
+			type: "text",
 			text: newText,
 			x: Math.floor((window.innerWidth / 2 - viewOffset.x) / visualCellSize) - Math.floor(newText.length / 2),
 			y: Math.floor((window.innerHeight / 2 - viewOffset.y) / visualCellSize),
@@ -334,62 +299,87 @@ const AsciiEditor: React.FC = () => {
 		setSelectedId(newEl.id);
 	};
 
+	const addBox = () => {
+		const newEl: BoxElement = {
+			id: Math.random().toString(36).substr(2, 9),
+			type: "box",
+			x: Math.floor((window.innerWidth / 2 - viewOffset.x) / visualCellSize) - 5,
+			y: Math.floor((window.innerHeight / 2 - viewOffset.y) / visualCellSize) - 2,
+			width: 10,
+			height: 5
+		};
+		setElements([...elements, newEl]);
+		setSelectedId(newEl.id);
+	};
+
 	const deleteSelected = () => {
 		if (!selectedId) return;
-		setElements(elements.filter((el) => el.id !== selectedId));
+		setElements(elements.filter(el => el.id !== selectedId));
 		setSelectedId(null);
 	};
 
 	const generateAscii = () => {
 		if (elements.length === 0) return;
 
-		const minX = Math.min(...elements.map((el) => el.x));
-		const maxX = Math.max(...elements.map((el) => el.x + el.text.length));
-		const minY = Math.min(...elements.map((el) => el.y));
-		const maxY = Math.max(...elements.map((el) => el.y));
+		const minX = Math.min(...elements.map(el => getElementBounds(el).left));
+		const maxX = Math.max(...elements.map(el => getElementBounds(el).right));
+		const minY = Math.min(...elements.map(el => getElementBounds(el).top));
+		const maxY = Math.max(...elements.map(el => getElementBounds(el).bottom));
 
 		const width = maxX - minX;
-		const height = maxY - minY + 1;
+		const height = maxY - minY;
 
-		const grid: string[][] = Array.from({ length: height }, () =>
-			Array.from({ length: width }, () => " "),
-		);
+		const grid: string[][] = Array.from({ length: height }, () => Array.from({ length: width }, () => " "));
 
+		// Draw boxes first so text goes on top
 		for (const el of elements) {
-			for (let i = 0; i < el.text.length; i++) {
-				const x = el.x - minX + i;
+			if (el.type === "box") {
+				const x = el.x - minX;
 				const y = el.y - minY;
-				if (x >= 0 && x < width && y >= 0 && y < height) {
-					grid[y][x] = el.text[i];
+				// Corners
+				grid[y][x] = "+";
+				grid[y][x + el.width - 1] = "+";
+				grid[y + el.height - 1][x] = "+";
+				grid[y + el.height - 1][x + el.width - 1] = "+";
+				// Edges
+				for (let i = 1; i < el.width - 1; i++) {
+					grid[y][x + i] = "-";
+					grid[y + el.height - 1][x + i] = "-";
+				}
+				for (let j = 1; j < el.height - 1; j++) {
+					grid[y + j][x] = "|";
+					grid[y + j][x + el.width - 1] = "|";
 				}
 			}
 		}
 
-		setAscii(grid.map((row) => row.join("")).join("\n"));
+		for (const el of elements) {
+			if (el.type === "text") {
+				for (let i = 0; i < el.text.length; i++) {
+					const x = el.x - minX + i;
+					const y = el.y - minY;
+					if (x >= 0 && x < width && y >= 0 && y < height) {
+						grid[y][x] = el.text[i];
+					}
+				}
+			}
+		}
+
+		setAscii(grid.map(row => row.join("")).join("\n"));
 		setShowAscii(true);
 	};
 
 	return (
 		<div className="fixed inset-0 overflow-hidden bg-white select-none">
-			<canvas
-				ref={canvasRef}
-				onMouseDown={handleMouseDown}
-				onTouchStart={handleTouchStart}
-				className="w-full h-full block cursor-crosshair"
-			/>
+			<canvas ref={canvasRef} onMouseDown={handleMouseDown} className="w-full h-full block cursor-crosshair" />
 
-			{/* Floating App Name Header */}
 			<div className="fixed top-8 left-8 z-50 flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-700">
 				<div className="w-2 h-2 bg-black dark:bg-white rounded-full animate-pulse" />
-				<h1 className="text-xs font-black tracking-[0.3em] uppercase text-black dark:text-white">
-					Genesis ASCII
-				</h1>
+				<h1 className="text-xs font-black tracking-[0.3em] uppercase text-black dark:text-white">Genesis ASCII</h1>
 			</div>
 			
-			{/* Decorative shadow for top-left visibility */}
 			<div className="fixed top-0 left-0 w-48 h-48 bg-gradient-to-br from-black/[0.03] to-transparent pointer-events-none z-40 dark:from-white/[0.03]" />
 
-			{/* Floating minimalist Action Bar */}
 			<div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl border border-white/40 dark:border-zinc-800/50 shadow-2xl rounded-2xl animate-in slide-in-from-bottom-8 duration-500">
 				<div className="flex items-center gap-2 pr-2 border-r border-black/5 dark:border-white/5">
 					<input
@@ -398,38 +388,30 @@ const AsciiEditor: React.FC = () => {
 						onChange={(e) => setNewText(e.target.value)}
 						placeholder="Add text..."
 						className="w-32 px-3 py-1.5 bg-black/5 dark:bg-white/5 rounded-lg focus:outline-none text-sm transition-all focus:w-48"
-						onKeyDown={(e) => e.key === "Enter" && addElement()}
+						onKeyDown={(e) => e.key === "Enter" && addText()}
 					/>
-					<button
-						type="button"
-						onClick={addElement}
-						className="p-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:scale-105 transition-transform"
-					>
+					<button type="button" onClick={addText} className="p-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:scale-105 transition-transform">
 						<Plus className="w-4 h-4" />
 					</button>
 				</div>
 
+				<div className="flex items-center gap-2 pr-2 border-r border-black/5 dark:border-white/5">
+					<button type="button" onClick={addBox} className="p-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:scale-105 transition-transform" title="Add Container Box">
+						<Square className="w-4 h-4" />
+					</button>
+				</div>
+
 				{selectedId && (
-					<button
-						type="button"
-						onClick={deleteSelected}
-						className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
-						title="Delete selected"
-					>
+					<button type="button" onClick={deleteSelected} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors" title="Delete selected">
 						<Trash2 className="w-5 h-5" />
 					</button>
 				)}
 
-				<button
-					type="button"
-					onClick={generateAscii}
-					className="flex items-center gap-2 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-sm shadow-lg shadow-black/10"
-				>
+				<button type="button" onClick={generateAscii} className="flex items-center gap-2 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-sm shadow-lg shadow-black/10">
 					<GripHorizontal className="w-4 h-4" /> Export
 				</button>
 			</div>
 
-			{/* ASCII Overlay Modal */}
 			{showAscii && (
 				<div className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
 					<div className="bg-white dark:bg-zinc-900 w-full max-w-4xl max-h-[80vh] rounded-3xl shadow-2xl overflow-hidden border border-black/5 dark:border-white/10 flex flex-col">
@@ -438,26 +420,16 @@ const AsciiEditor: React.FC = () => {
 								<FileText className="w-5 h-5 opacity-40" /> ASCII Manifest
 							</h3>
 							<div className="flex gap-2">
-								<button
-									type="button"
-									onClick={() => navigator.clipboard.writeText(ascii)}
-									className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors"
-								>
+								<button type="button" onClick={() => navigator.clipboard.writeText(ascii)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors">
 									<Copy className="w-5 h-5" />
 								</button>
-								<button
-									type="button"
-									onClick={() => setShowAscii(false)}
-									className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors"
-								>
+								<button type="button" onClick={() => setShowAscii(false)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors">
 									<X className="w-5 h-5" />
 								</button>
 							</div>
 						</div>
 						<div className="flex-1 overflow-auto p-6 bg-zinc-50 dark:bg-zinc-950">
-							<pre className="font-mono text-[10px] leading-[10px] tracking-[0px] whitespace-pre">
-								{ascii}
-							</pre>
+							<pre className="font-mono text-[10px] leading-[10px] tracking-[0px] whitespace-pre">{ascii}</pre>
 						</div>
 					</div>
 				</div>
