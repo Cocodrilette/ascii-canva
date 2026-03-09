@@ -1,61 +1,164 @@
-# FRONTEND GENESIS: High-Performance Glassmorphism Stack
+# 🤖 AI Agent
 
-This stack prioritizes aesthetics (Apple-inspired), developer experience (Indentify patterns and suggest refactors), and performance.
+> Built on the **Frontend Genesis** stack — glassmorphism UI, type-safe data flows, and secure proxy architecture.
 
-## Workflow
+---
 
-Do not run `npm run build` or `npm run lint`. 
+## Stack
 
-## 🏗️ Core Technical Stack
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js (Pages Router) |
+| Language | TypeScript (Strict) |
+| Styling | Tailwind CSS v4 |
+| Icons | Lucide React |
+| Notifications | Sileo |
+| State | React Context + Custom Hooks |
+| Data Fetching | TanStack Query |
+| Validation | Zod |
+| Auth & Realtime | Supabase |
+| Linter | Biome |
 
-- **Framework**: Next.js (Pages Router) - Proven stability and SEO.
-- **Language**: TypeScript (Strict Mode) - Mandatory for reliable data flows.
-- **Styling**: Tailwind CSS v4 - Optimized for high-density and modern CSS features.
-- **Linter/Formatter**: Biome - Fast, unified tool for code quality.
-- **Icons**: Lucide React - Minimalist and consistent.
-- **Notifications**: Sileo - Object-based, beautiful toast system.
-- **State**: React Context API + Custom Hooks - Single source of truth.
-- **Data Fetching**: Use TanStack Query for complex caching and auto-retries.
-- **Data Validation**: Use Zod for API response validation and type safety.
-- **Backend Proxy**: Next.js API routes with a proxy layer for secure external API calls.
-- **Supabase**: For authentication and real-time data needs, integrated via API routes. The user MUST ba authenticated in the supabase cli.
+---
 
-## 🎨 Design System: "The Glass Standard"
+## Getting Started
 
-The "Genesis" aesthetic is defined by elements that levitate and interact with light.
+### Prerequisites
 
-### Glassmorphism Utility (Tailwind)
+- Node.js 20+
+- Supabase CLI (authenticated)
 
 ```bash
-# Light Mode
-bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl rounded-3xl
-
-# Dark Mode
-dark:bg-zinc-900/60 dark:border-zinc-800/50 dark:shadow-2xl
+supabase login
 ```
 
-### UX Principles
+### Install & Run
 
-1. **High Density**: Prefer `p-4` or `p-6` over `p-10`. Content should be visible without excessive scrolling.
-2. **Stable Layouts**: Use fixed-height skeletons during loading. Avoid "jumping" UI elements.
-3. **Interactive Feedback**: All calculations should be traceable (clickable cards with detail modals).
-4. **Platform Native**: Sidebar for desktop, bottom-drawer or compact header for mobile.
+```bash
+npm install
+npm run dev
+```
 
-## 🛠️ Advanced Development Patterns
+Open [http://localhost:3000](http://localhost:3000).
 
-### 1. Context-Driven Data Flow
+---
 
-- **Provider**: Wraps the layout to handle global fetch and caching.
-- **Custom Hook**: `useData()` provides state, setters, and refetching.
-- **Atomic Components**: Components should be independent and subscribe only to the data they need via the hook.
+## Project Structure
 
-### 2. Proxy-Based Security (Next.js 16)
+```
+src/
+├── components/       # Atomic UI components (<150 lines each)
+├── context/          # React Context providers
+├── hooks/            # Custom hooks (useData, useAgent, etc.)
+├── pages/
+│   ├── api/          # Next.js API routes (proxy layer)
+│   └── index.tsx     # Entry point
+├── proxy.ts          # Network boundary + session handling
+└── lib/
+    ├── supabase.ts   # Supabase client
+    └── schemas.ts    # Zod validation schemas
+```
 
-- Use `src/proxy.ts` for network boundary checks.
-- Handle session via HTTP-only cookies.
-- Protect both Pages and API routes in a single standard matcher.
+---
 
-## 📝 Best Practices for AI Agents
+## Architecture
 
-2. **Safety**: Implement "Null-Safe" rendering using `(value ?? 0).toLocaleString()`.
-3. **Modularity**: If a file exceeds 150 lines, extract logical UI blocks to `/src/components`.
+### Data Flow
+
+```
+UI Component
+    └── useData() hook
+            └── TanStack Query
+                    └── /pages/api/* (proxy)
+                            └── External API / Supabase
+```
+
+### Security
+
+All external API calls go through `src/proxy.ts`. Sessions are managed via HTTP-only cookies. API keys are never exposed to the client.
+
+### Design System
+
+Components follow the **Retro OS Standard** — inspired by classic operating systems (Win95, Mac OS 8, early UNIX terminals).
+
+#### Palette
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--os-bg` | `#C0C0C0` | Window backgrounds |
+| `--os-surface` | `#FFFFFF` | Input fields, content areas |
+| `--os-titlebar` | `#000080` | Active window title bars |
+| `--os-titlebar-text` | `#FFFFFF` | Title bar labels |
+| `--os-border-light` | `#FFFFFF` | Raised bevel (top/left) |
+| `--os-border-dark` | `#808080` | Sunken bevel (bottom/right) |
+| `--os-accent` | `#000080` | Selected items, CTAs |
+| `--os-terminal` | `#0D0D0D` | Terminal/log panels |
+| `--os-green` | `#00FF41` | Terminal cursor, status indicators |
+
+#### Window Chrome
+
+```css
+/* Raised panel (buttons, cards) */
+border-top: 2px solid #FFFFFF;
+border-left: 2px solid #FFFFFF;
+border-right: 2px solid #808080;
+border-bottom: 2px solid #808080;
+background: #C0C0C0;
+
+/* Sunken panel (inputs, wells) */
+border-top: 2px solid #808080;
+border-left: 2px solid #808080;
+border-right: 2px solid #FFFFFF;
+border-bottom: 2px solid #FFFFFF;
+background: #FFFFFF;
+
+/* Title bar */
+background: #000080;
+color: #FFFFFF;
+font-family: 'VT323', 'Courier New', monospace;
+font-size: 12px;
+padding: 2px 4px;
+```
+
+#### Typography
+
+| Role | Font | Size |
+|------|------|------|
+| UI Labels | `'MS Sans Serif', sans-serif` | 11px |
+| Title bars | `'VT323', monospace` | 13px |
+| Terminal output | `'Courier New', monospace` | 13px |
+| Body text | `'Times New Roman', serif` | 14px |
+
+#### UX Principles
+
+1. **No blur, no transparency** — all surfaces are fully opaque with hard bevel borders.
+2. **8px grid** — spacing in multiples of 8; no fractional values.
+3. **Cursor** — use `cursor-default` everywhere except links (`cursor-pointer` with a classic arrow, not a hand on interactive widgets).
+4. **Loading states** — use a blinking `█` cursor or a classic progress bar (segmented, not a smooth fill).
+5. **Modals** — styled as draggable OS dialog boxes with a title bar, close button (`✕`), and raised content area.
+
+---
+
+## Environment Variables
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+EXTERNAL_API_KEY=
+```
+
+---
+
+## Development Guidelines
+
+- **Files > 150 lines** → extract to `/src/components`
+- **Null safety** → always use `(value ?? 0).toLocaleString()`
+- **No `npm run build` or `npm run lint`** during development — Biome handles it on save
+- **Loading states** → use fixed-height skeletons to prevent layout shift
+
+---
+
+## License
+
+MIT
