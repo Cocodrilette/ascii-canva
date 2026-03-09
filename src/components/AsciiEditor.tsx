@@ -1109,9 +1109,9 @@ const AsciiEditor: React.FC = () => {
               Text Content
             </label>
             <div className="flex gap-1">
-              <input
+              <textarea
                 id="text-content-input"
-                type="text"
+                rows={3}
                 value={
                   selectedElement?.type === "text"
                     ? (selectedElement as TextElement).text
@@ -1123,12 +1123,13 @@ const AsciiEditor: React.FC = () => {
                     : setNewText(e.target.value)
                 }
                 placeholder="Enter text..."
-                className="retro-input flex-1"
-                onKeyDown={(e) =>
-                  e.key === "Enter" &&
-                  !selectedId &&
-                  addExtensionElement("text")
-                }
+                className="retro-input flex-1 min-h-[60px] resize-none"
+                onKeyDown={(e) => {
+                   if (e.key === "Enter" && !e.shiftKey && !selectedId) {
+                      e.preventDefault();
+                      addExtensionElement("text");
+                   }
+                }}
               />
             </div>
           </div>

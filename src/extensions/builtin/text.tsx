@@ -24,6 +24,9 @@ export const textExtension: AsciiExtension<TextElement, TextParams> = {
   }),
 
   render: (ctx, element, isSelected, visualCellSize) => {
+    const lines = element.text.split("\n");
+    const maxLineLength = Math.max(...lines.map(l => l.length), 0);
+    
     if (isSelected) {
       // Classic focus rectangle (dotted)
       ctx.save();
@@ -33,8 +36,8 @@ export const textExtension: AsciiExtension<TextElement, TextParams> = {
       ctx.strokeRect(
         element.x * visualCellSize - 1,
         element.y * visualCellSize - 1,
-        element.text.length * visualCellSize + 2,
-        visualCellSize + 2,
+        maxLineLength * visualCellSize + 4,
+        lines.length * visualCellSize + 2,
       );
       ctx.restore();
     }
@@ -42,29 +45,39 @@ export const textExtension: AsciiExtension<TextElement, TextParams> = {
     ctx.fillStyle = "#000000";
     ctx.font = `${visualCellSize}px 'Courier New', monospace`;
     ctx.textBaseline = "top";
-    for (let i = 0; i < element.text.length; i++) {
-      ctx.fillText(
-        element.text[i],
-        (element.x + i) * visualCellSize + visualCellSize * 0.15,
-        element.y * visualCellSize,
-      );
-    }
+    
+    lines.forEach((line, lineIdx) => {
+      for (let i = 0; i < line.length; i++) {
+        ctx.fillText(
+          line[i],
+          (element.x + i) * visualCellSize + visualCellSize * 0.15,
+          (element.y + lineIdx) * visualCellSize,
+        );
+      }
+    });
   },
 
-  getBounds: (element) => ({
-    left: element.x,
-    top: element.y,
-    right: element.x + element.text.length,
-    bottom: element.y + 1,
-  }),
+  getBounds: (element) => {
+    const lines = element.text.split("\n");
+    const maxLineLength = Math.max(...lines.map(l => l.length), 0);
+    return {
+      left: element.x,
+      top: element.y,
+      right: element.x + maxLineLength,
+      bottom: element.y + lines.length,
+    };
+  },
 
   toAscii: (element, grid, offset) => {
-    for (let i = 0; i < element.text.length; i++) {
-      const x = element.x - offset.x + i;
-      const y = element.y - offset.y;
-      if (y >= 0 && y < grid.length && x >= 0 && x < grid[0].length) {
-        grid[y][x] = element.text[i];
+    const lines = element.text.split("\n");
+    lines.forEach((line, lineIdx) => {
+      for (let i = 0; i < line.length; i++) {
+        const x = element.x - offset.x + i;
+        const y = element.y - offset.y + lineIdx;
+        if (y >= 0 && y < grid.length && x >= 0 && x < grid[0].length) {
+          grid[y][x] = line[i];
+        }
       }
-    }
+    });
   },
 };
