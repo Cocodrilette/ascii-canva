@@ -6,6 +6,56 @@
 export const ASCII_CHARS = "@%#*+=-:. ";
 
 /**
+ * Compresses an ASCII string using a custom Run-Length Encoding (RLE).
+ * Standard RLE for ASCII characters.
+ */
+export const compressAscii = (text: string): string => {
+  if (!text) return "";
+  let result = "";
+  let i = 0;
+  while (i < text.length) {
+    let count = 1;
+    while (i + 1 < text.length && text[i] === text[i + 1]) {
+      count++;
+      i++;
+    }
+    if (count > 1) {
+      result += `${count}${text[i]}`;
+    } else {
+      // If it's a digit, we escape it (though ASCII_CHARS doesn't have digits)
+      if (/\d/.test(text[i])) result += "\\";
+      result += text[i];
+    }
+    i++;
+  }
+  return result;
+};
+
+/**
+ * Decompresses an RLE-encoded ASCII string.
+ */
+export const decompressAscii = (compressed: string): string => {
+  let result = "";
+  let i = 0;
+  while (i < compressed.length) {
+    let countStr = "";
+    while (i < compressed.length && /\d/.test(compressed[i])) {
+      countStr += compressed[i];
+      i++;
+    }
+    if (countStr) {
+      const count = parseInt(countStr);
+      result += compressed[i].repeat(count);
+    } else {
+      if (compressed[i] === "\\") i++;
+      result += compressed[i];
+    }
+    i++;
+  }
+  return result;
+};
+
+/**
  * Translates a given HTML Canvas element's content into an ASCII string.
  * @param canvas - The HTMLCanvasElement to translate.
  * @param resolution - The width (in characters) of the ASCII output.

@@ -5,6 +5,7 @@ export interface BaseElement {
   type: ElementType;
   x: number; // grid x
   y: number; // grid y
+  isCenter?: boolean;
 }
 
 export interface AsciiExtension<
