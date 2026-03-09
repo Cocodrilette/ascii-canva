@@ -154,7 +154,6 @@ const AsciiEditor: React.FC = () => {
 				ctx.lineWidth = 2 * zoom;
 				ctx.strokeRect(el.x * visualCellSize + 2, el.y * visualCellSize + 2, el.width * visualCellSize - 4, el.height * visualCellSize - 4);
 				
-				// Resize handle
 				if (isSelected) {
 					ctx.fillStyle = "#0066ff";
 					ctx.fillRect((el.x + el.width) * visualCellSize - 6, (el.y + el.height) * visualCellSize - 6, 12, 12);
@@ -179,6 +178,7 @@ const AsciiEditor: React.FC = () => {
 	const handleMouseUp = useCallback(() => {
 		setIsDragging(false);
 		setIsResizing(false);
+		setIsPanning(false);
 		setCapturedIds([]);
 	}, []);
 
@@ -191,8 +191,6 @@ const AsciiEditor: React.FC = () => {
 					if (el.id === selectedId && el.type === "box") {
 						const newWidth = Math.max(2, gridX - el.x + 1);
 						const newHeight = Math.max(2, gridY - el.y + 1);
-						
-						// Check if new size contains all current children
 						const children = prev.filter(child => isInside(child, el as BoxElement));
 						if (children.length > 0) {
 							const minR = Math.max(...children.map(c => getElementBounds(c).right));
@@ -210,19 +208,69 @@ const AsciiEditor: React.FC = () => {
 			} else if (isDragging && selectedId) {
 				const dx = gridX - dragOffset.x;
 				const dy = gridY - dragOffset.y;
-				
-				setElements(prev => prev.map(el => {
-					if (el.id === selectedId || capturedIds.includes(el.id)) {
-						return { ...el, x: el.x + dx, y: el.y + dy };
-					}
-					return el;
-				}));
-				setDragOffset({ x: gridX, y: gridY });
+				if (dx !== 0 || dy !== 0) {
+					setElements(prev => prev.map(el => {
+						if (el.id === selectedId || capturedIds.includes(el.id)) {
+							return { ...el, x: el.x + dx, y: el.y + dy };
+						}
+						return el;
+					}));
+					setDragOffset({ x: gridX, y: gridY });
+				}
 			} else if (isPanning) {
 				setViewOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
 			}
 		},
 		[isDragging, isResizing, isPanning, selectedId, getGridCoords, dragOffset, panStart, capturedIds],
+	);
+
+	const handleTouchEnd = useCallback(() => {
+		setTouchDist(null);
+		setIsDragging(false);
+		setIsResizing(false);
+		setIsPanning(false);
+		setCapturedIds([]);
+	}, []);
+
+	const handleTouchMove = useCallback(
+		(e: TouchEvent) => {
+			if (e.touches.length === 2 && touchDist !== null) {
+				const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+				const delta = dist / touchDist;
+				setZoom(prev => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev * delta)));
+				setTouchDist(dist);
+			} else if (e.touches.length === 1) {
+				const touch = e.touches[0];
+				const { x: gridX, y: gridY } = getGridCoords(touch.clientX, touch.clientY);
+
+				if (isResizing && selectedId) {
+					setElements(prev => prev.map(el => {
+						if (el.id === selectedId && el.type === "box") {
+							const newWidth = Math.max(2, gridX - el.x + 1);
+							const newHeight = Math.max(2, gridY - el.y + 1);
+							const children = prev.filter(child => isInside(child, el as BoxElement));
+							if (children.length > 0) {
+								const minR = Math.max(...children.map(c => getElementBounds(c).right));
+								const minB = Math.max(...children.map(c => getElementBounds(c).bottom));
+								return { ...el, width: Math.max(newWidth, minR - el.x), height: Math.max(newHeight, minB - el.y) };
+							}
+							return { ...el, width: newWidth, height: newHeight };
+						}
+						return el;
+					}));
+				} else if (isDragging && selectedId) {
+					const dx = gridX - dragOffset.x;
+					const dy = gridY - dragOffset.y;
+					if (dx !== 0 || dy !== 0) {
+						setElements(prev => prev.map(el => (el.id === selectedId || capturedIds.includes(el.id) ? { ...el, x: el.x + dx, y: el.y + dy } : el)));
+						setDragOffset({ x: gridX, y: gridY });
+					}
+				} else if (isPanning) {
+					setViewOffset({ x: touch.clientX - panStart.x, y: touch.clientY - panStart.y });
+				}
+			}
+		},
+		[isDragging, isResizing, isPanning, selectedId, getGridCoords, dragOffset, panStart, capturedIds, touchDist],
 	);
 
 	const handleWheel = useCallback((e: WheelEvent) => {
@@ -238,21 +286,21 @@ const AsciiEditor: React.FC = () => {
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		canvas?.addEventListener("wheel", handleWheel, { passive: false });
-		if (isDragging || isPanning || isResizing) {
-			window.addEventListener("mousemove", handleMouseMove);
-			window.addEventListener("mouseup", handleMouseUp);
-		}
+		window.addEventListener("mousemove", handleMouseMove);
+		window.addEventListener("mouseup", handleMouseUp);
+		window.addEventListener("touchmove", handleTouchMove, { passive: false });
+		window.addEventListener("touchend", handleTouchEnd);
 		return () => {
 			canvas?.removeEventListener("wheel", handleWheel);
 			window.removeEventListener("mousemove", handleMouseMove);
 			window.removeEventListener("mouseup", handleMouseUp);
+			window.removeEventListener("touchmove", handleTouchMove);
+			window.removeEventListener("touchend", handleTouchEnd);
 		};
-	}, [isDragging, isPanning, isResizing, handleMouseMove, handleMouseUp, handleWheel]);
+	}, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd, handleWheel]);
 
 	const handleMouseDown = (e: React.MouseEvent) => {
 		const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
-
-		// Check for resize handle first if a box is selected
 		const selected = elements.find(el => el.id === selectedId);
 		if (selected?.type === "box") {
 			const handleX = (selected.x + selected.width) * visualCellSize + viewOffset.x;
@@ -262,18 +310,14 @@ const AsciiEditor: React.FC = () => {
 				return;
 			}
 		}
-
 		const clickedEl = [...elements].reverse().find(el => {
 			const b = getElementBounds(el);
 			return gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom;
 		});
-
 		if (clickedEl) {
 			setSelectedId(clickedEl.id);
 			setIsDragging(true);
 			setDragOffset({ x: gridX, y: gridY });
-			
-			// Auto-grouping: if it's a box, capture children
 			if (clickedEl.type === "box") {
 				const children = elements.filter(el => isInside(el, clickedEl as BoxElement));
 				setCapturedIds(children.map(c => c.id));
@@ -282,6 +326,42 @@ const AsciiEditor: React.FC = () => {
 			setSelectedId(null);
 			setIsPanning(true);
 			setPanStart({ x: e.clientX - viewOffset.x, y: e.clientY - viewOffset.y });
+		}
+	};
+
+	const handleTouchStart = (e: React.TouchEvent) => {
+		if (e.touches.length === 2) {
+			const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+			setTouchDist(dist);
+		} else if (e.touches.length === 1) {
+			const touch = e.touches[0];
+			const { x: gridX, y: gridY } = getGridCoords(touch.clientX, touch.clientY);
+			const selected = elements.find(el => el.id === selectedId);
+			if (selected?.type === "box") {
+				const handleX = (selected.x + selected.width) * visualCellSize + viewOffset.x;
+				const handleY = (selected.y + selected.height) * visualCellSize + viewOffset.y;
+				if (Math.abs(touch.clientX - handleX) < 30 && Math.abs(touch.clientY - handleY) < 30) {
+					setIsResizing(true);
+					return;
+				}
+			}
+			const clickedEl = [...elements].reverse().find(el => {
+				const b = getElementBounds(el);
+				return gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom;
+			});
+			if (clickedEl) {
+				setSelectedId(clickedEl.id);
+				setIsDragging(true);
+				setDragOffset({ x: gridX, y: gridY });
+				if (clickedEl.type === "box") {
+					const children = elements.filter(el => isInside(el, clickedEl as BoxElement));
+					setCapturedIds(children.map(c => c.id));
+				}
+			} else {
+				setSelectedId(null);
+				setIsPanning(true);
+				setPanStart({ x: touch.clientX - viewOffset.x, y: touch.clientY - viewOffset.y });
+			}
 		}
 	};
 
@@ -320,28 +400,21 @@ const AsciiEditor: React.FC = () => {
 
 	const generateAscii = () => {
 		if (elements.length === 0) return;
-
 		const minX = Math.min(...elements.map(el => getElementBounds(el).left));
 		const maxX = Math.max(...elements.map(el => getElementBounds(el).right));
 		const minY = Math.min(...elements.map(el => getElementBounds(el).top));
 		const maxY = Math.max(...elements.map(el => getElementBounds(el).bottom));
-
 		const width = maxX - minX;
 		const height = maxY - minY;
-
 		const grid: string[][] = Array.from({ length: height }, () => Array.from({ length: width }, () => " "));
-
-		// Draw boxes first so text goes on top
 		for (const el of elements) {
 			if (el.type === "box") {
 				const x = el.x - minX;
 				const y = el.y - minY;
-				// Corners
 				grid[y][x] = "+";
 				grid[y][x + el.width - 1] = "+";
 				grid[y + el.height - 1][x] = "+";
 				grid[y + el.height - 1][x + el.width - 1] = "+";
-				// Edges
 				for (let i = 1; i < el.width - 1; i++) {
 					grid[y][x + i] = "-";
 					grid[y + el.height - 1][x + i] = "-";
@@ -352,7 +425,6 @@ const AsciiEditor: React.FC = () => {
 				}
 			}
 		}
-
 		for (const el of elements) {
 			if (el.type === "text") {
 				for (let i = 0; i < el.text.length; i++) {
@@ -364,22 +436,18 @@ const AsciiEditor: React.FC = () => {
 				}
 			}
 		}
-
 		setAscii(grid.map(row => row.join("")).join("\n"));
 		setShowAscii(true);
 	};
 
 	return (
 		<div className="fixed inset-0 overflow-hidden bg-white select-none">
-			<canvas ref={canvasRef} onMouseDown={handleMouseDown} className="w-full h-full block cursor-crosshair" />
-
+			<canvas ref={canvasRef} onMouseDown={handleMouseDown} onTouchStart={handleTouchStart} className="w-full h-full block cursor-crosshair" />
 			<div className="fixed top-8 left-8 z-50 flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-700">
 				<div className="w-2 h-2 bg-black dark:bg-white rounded-full animate-pulse" />
 				<h1 className="text-xs font-black tracking-[0.3em] uppercase text-black dark:text-white">Genesis ASCII</h1>
 			</div>
-			
 			<div className="fixed top-0 left-0 w-48 h-48 bg-gradient-to-br from-black/[0.03] to-transparent pointer-events-none z-40 dark:from-white/[0.03]" />
-
 			<div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl border border-white/40 dark:border-zinc-800/50 shadow-2xl rounded-2xl animate-in slide-in-from-bottom-8 duration-500">
 				<div className="flex items-center gap-2 pr-2 border-r border-black/5 dark:border-white/5">
 					<input
@@ -394,24 +462,20 @@ const AsciiEditor: React.FC = () => {
 						<Plus className="w-4 h-4" />
 					</button>
 				</div>
-
 				<div className="flex items-center gap-2 pr-2 border-r border-black/5 dark:border-white/5">
 					<button type="button" onClick={addBox} className="p-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:scale-105 transition-transform" title="Add Container Box">
 						<Square className="w-4 h-4" />
 					</button>
 				</div>
-
 				{selectedId && (
 					<button type="button" onClick={deleteSelected} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors" title="Delete selected">
 						<Trash2 className="w-5 h-5" />
 					</button>
 				)}
-
 				<button type="button" onClick={generateAscii} className="flex items-center gap-2 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-sm shadow-lg shadow-black/10">
 					<GripHorizontal className="w-4 h-4" /> Export
 				</button>
 			</div>
-
 			{showAscii && (
 				<div className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
 					<div className="bg-white dark:bg-zinc-900 w-full max-w-4xl max-h-[80vh] rounded-3xl shadow-2xl overflow-hidden border border-black/5 dark:border-white/10 flex flex-col">
