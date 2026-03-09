@@ -1,306 +1,257 @@
-import {
-  Copy,
-  Download,
-  FileText,
-  GripHorizontal,
-  MousePointer2,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { Copy, Download, FileText, GripHorizontal, MousePointer2, Plus, Trash2, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { translateCanvasToAscii } from "../utils/ascii";
 
 interface TextElement {
-  id: string;
-  text: string;
-  x: number; // grid x
-  y: number; // grid y
+	id: string;
+	text: string;
+	x: number; // grid x
+	y: number; // grid y
 }
 
-const GRID_COLS = 80;
-const GRID_ROWS = 30;
-const CELL_SIZE = 12; // visual size of a cell in pixels
+const CELL_SIZE = 14; // visual size of a cell in pixels
 
 /**
- * AsciiEditor component with grid-based element positioning.
+ * Immersive Full-Screen Grid Canvas Editor
  */
 const AsciiEditor: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [elements, setElements] = useState<TextElement[]>([
-    { id: "1", text: "HELLO WORLD", x: 5, y: 5 },
-    { id: "2", text: "GRID EDITOR", x: 5, y: 10 },
-  ]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [ascii, setAscii] = useState("");
-  const [newText, setNewText] = useState("");
+	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const [elements, setElements] = useState<TextElement[]>([
+		{ id: "1", text: "GENESIS ASCII", x: 10, y: 10 },
+		{ id: "2", text: "DRAG ELEMENTS", x: 10, y: 12 },
+	]);
+	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [isDragging, setIsDragging] = useState(false);
+	const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+	const [ascii, setAscii] = useState("");
+	const [showAscii, setShowAscii] = useState(false);
+	const [newText, setNewText] = useState("");
+	const [gridSize, setGridSize] = useState({ cols: 80, rows: 40 });
 
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+	// Handle window resize to fill screen
+	useEffect(() => {
+		const handleResize = () => {
+			const cols = Math.floor(window.innerWidth / CELL_SIZE);
+			const rows = Math.floor(window.innerHeight / CELL_SIZE);
+			setGridSize({ cols, rows });
+		};
 
-    // Clear with light theme / dark theme background
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+		handleResize();
+		window.addEventListener("resize", handleResize);
+		return () => window.removeEventListener("resize", handleResize);
+	}, []);
 
-    // Draw grid lines (subtle)
-    ctx.strokeStyle = "#f0f0f0";
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= GRID_COLS; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * CELL_SIZE, 0);
-      ctx.lineTo(i * CELL_SIZE, GRID_ROWS * CELL_SIZE);
-      ctx.stroke();
-    }
-    for (let j = 0; j <= GRID_ROWS; j++) {
-      ctx.beginPath();
-      ctx.moveTo(0, j * CELL_SIZE);
-      ctx.lineTo(GRID_COLS * CELL_SIZE, j * CELL_SIZE);
-      ctx.stroke();
-    }
+	const draw = useCallback(() => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return;
 
-    // Draw elements
-    ctx.font = `${CELL_SIZE}px monospace`;
-    ctx.textBaseline = "top";
+		// Set canvas size to match window
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
 
-    for (const el of elements) {
-      const isSelected = el.id === selectedId;
+		// Background
+		ctx.fillStyle = "#ffffff";
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Highlight selection
-      if (isSelected) {
-        ctx.fillStyle = "rgba(0, 120, 255, 0.1)";
-        ctx.fillRect(
-          el.x * CELL_SIZE,
-          el.y * CELL_SIZE,
-          el.text.length * CELL_SIZE,
-          CELL_SIZE,
-        );
-        ctx.strokeStyle = "rgba(0, 120, 255, 0.5)";
-        ctx.strokeRect(
-          el.x * CELL_SIZE,
-          el.y * CELL_SIZE,
-          el.text.length * CELL_SIZE,
-          CELL_SIZE,
-        );
-      }
+		// Grid Lines
+		ctx.strokeStyle = "rgba(0,0,0,0.03)";
+		ctx.lineWidth = 1;
+		for (let i = 0; i <= gridSize.cols; i++) {
+			ctx.beginPath();
+			ctx.moveTo(i * CELL_SIZE, 0);
+			ctx.lineTo(i * CELL_SIZE, canvas.height);
+			ctx.stroke();
+		}
+		for (let j = 0; j <= gridSize.rows; j++) {
+			ctx.beginPath();
+			ctx.moveTo(0, j * CELL_SIZE);
+			ctx.lineTo(canvas.width, j * CELL_SIZE);
+			ctx.stroke();
+		}
 
-      ctx.fillStyle = isSelected ? "#0066ff" : "black";
-      // Draw characters one by one to ensure alignment
-      for (let i = 0; i < el.text.length; i++) {
-        ctx.fillText(
-          el.text[i],
-          (el.x + i) * CELL_SIZE + CELL_SIZE * 0.2, // slight offset for centering char
-          el.y * CELL_SIZE,
-        );
-      }
-    }
-  }, [elements, selectedId]);
+		// Draw Elements
+		ctx.font = `${CELL_SIZE}px monospace`;
+		ctx.textBaseline = "top";
 
-  useEffect(() => {
-    draw();
-  }, [draw]);
+		for (const el of elements) {
+			const isSelected = el.id === selectedId;
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+			if (isSelected) {
+				ctx.fillStyle = "rgba(0, 102, 255, 0.05)";
+				ctx.fillRect(el.x * CELL_SIZE, el.y * CELL_SIZE, el.text.length * CELL_SIZE, CELL_SIZE);
+				ctx.strokeStyle = "rgba(0, 102, 255, 0.2)";
+				ctx.strokeRect(el.x * CELL_SIZE, el.y * CELL_SIZE, el.text.length * CELL_SIZE, CELL_SIZE);
+			}
 
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const gridX = Math.floor(mouseX / CELL_SIZE);
-    const gridY = Math.floor(mouseY / CELL_SIZE);
+			ctx.fillStyle = isSelected ? "#0066ff" : "#18181b";
+			for (let i = 0; i < el.text.length; i++) {
+				ctx.fillText(el.text[i], (el.x + i) * CELL_SIZE + CELL_SIZE * 0.15, el.y * CELL_SIZE);
+			}
+		}
+	}, [elements, selectedId, gridSize]);
 
-    // Find clicked element
-    const clickedEl = [...elements]
-      .reverse()
-      .find(
-        (el) =>
-          gridY === el.y && gridX >= el.x && gridX < el.x + el.text.length,
-      );
+	useEffect(() => {
+		draw();
+	}, [draw]);
 
-    if (clickedEl) {
-      setSelectedId(clickedEl.id);
-      setIsDragging(true);
-      setDragOffset({ x: gridX - clickedEl.x, y: gridY - clickedEl.y });
-    } else {
-      setSelectedId(null);
-    }
-  };
+	const handleMouseDown = (e: React.MouseEvent) => {
+		const gridX = Math.floor(e.clientX / CELL_SIZE);
+		const gridY = Math.floor(e.clientY / CELL_SIZE);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging || !selectedId) return;
+		const clickedEl = [...elements]
+			.reverse()
+			.find((el) => gridY === el.y && gridX >= el.x && gridX < el.x + el.text.length);
 
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+		if (clickedEl) {
+			setSelectedId(clickedEl.id);
+			setIsDragging(true);
+			setDragOffset({ x: gridX - clickedEl.x, y: gridY - clickedEl.y });
+		} else {
+			setSelectedId(null);
+		}
+	};
 
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const gridX = Math.floor(mouseX / CELL_SIZE);
-    const gridY = Math.floor(mouseY / CELL_SIZE);
+	const handleMouseMove = (e: React.MouseEvent) => {
+		if (!isDragging || !selectedId) return;
 
-    const newX = gridX - dragOffset.x;
-    const newY = gridY - dragOffset.y;
+		const gridX = Math.floor(e.clientX / CELL_SIZE);
+		const gridY = Math.floor(e.clientY / CELL_SIZE);
 
-    setElements((prev) =>
-      prev.map((el) =>
-        el.id === selectedId ? { ...el, x: newX, y: newY } : el,
-      ),
-    );
-  };
+		const newX = gridX - dragOffset.x;
+		const newY = gridY - dragOffset.y;
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+		setElements((prev) => prev.map((el) => (el.id === selectedId ? { ...el, x: newX, y: newY } : el)));
+	};
 
-  const addElement = () => {
-    if (!newText.trim()) return;
-    const newEl: TextElement = {
-      id: Math.random().toString(36).substr(2, 9),
-      text: newText,
-      x: 2,
-      y: 2,
-    };
-    setElements([...elements, newEl]);
-    setNewText("");
-    setSelectedId(newEl.id);
-  };
+	const handleMouseUp = () => setIsDragging(false);
 
-  const deleteSelected = () => {
-    if (!selectedId) return;
-    setElements(elements.filter((el) => el.id !== selectedId));
-    setSelectedId(null);
-  };
+	const addElement = () => {
+		if (!newText.trim()) return;
+		const newEl: TextElement = {
+			id: Math.random().toString(36).substr(2, 9),
+			text: newText,
+			x: Math.floor(gridSize.cols / 2) - Math.floor(newText.length / 2),
+			y: Math.floor(gridSize.rows / 2),
+		};
+		setElements([...elements, newEl]);
+		setNewText("");
+		setSelectedId(newEl.id);
+	};
 
-  const generateAscii = () => {
-    const grid: string[][] = Array.from({ length: GRID_ROWS }, () =>
-      Array.from({ length: GRID_COLS }, () => " "),
-    );
+	const deleteSelected = () => {
+		if (!selectedId) return;
+		setElements(elements.filter((el) => el.id !== selectedId));
+		setSelectedId(null);
+	};
 
-    for (const el of elements) {
-      for (let i = 0; i < el.text.length; i++) {
-        const x = el.x + i;
-        const y = el.y;
-        if (x >= 0 && x < GRID_COLS && y >= 0 && y < GRID_ROWS) {
-          grid[y][x] = el.text[i];
-        }
-      }
-    }
+	const generateAscii = () => {
+		const grid: string[][] = Array.from({ length: gridSize.rows }, () =>
+			Array.from({ length: gridSize.cols }, () => " "),
+		);
 
-    setAscii(grid.map((row) => row.join("")).join("\n"));
-  };
+		for (const el of elements) {
+			for (let i = 0; i < el.text.length; i++) {
+				const x = el.x + i;
+				const y = el.y;
+				if (x >= 0 && x < gridSize.cols && y >= 0 && y < gridSize.rows) {
+					grid[y][x] = el.text[i];
+				}
+			}
+		}
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(ascii);
-  };
+		setAscii(grid.map((row) => row.join("")).join("\n"));
+		setShowAscii(true);
+	};
 
-  const downloadAscii = () => {
-    const blob = new Blob([ascii], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "ascii-art.txt";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+	return (
+		<div className="fixed inset-0 overflow-hidden bg-white select-none">
+			<canvas
+				ref={canvasRef}
+				onMouseDown={handleMouseDown}
+				onMouseMove={handleMouseMove}
+				onMouseUp={handleMouseUp}
+				onMouseLeave={handleMouseUp}
+				className="w-full h-full block cursor-crosshair"
+			/>
 
-  return (
-    <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto p-6">
-      <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl rounded-3xl p-6 dark:bg-zinc-900/60 dark:border-zinc-800/50 dark:shadow-2xl">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <MousePointer2 className="w-6 h-6" /> Grid Canvas Editor
-          </h2>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={newText}
-              onChange={(e) => setNewText(e.target.value)}
-              placeholder="Add new text..."
-              className="px-4 py-2 bg-white/40 border border-black/10 rounded-full focus:outline-none focus:ring-2 focus:ring-black/20"
-              onKeyDown={(e) => e.key === "Enter" && addElement()}
-            />
-            <button
-              type="button"
-              onClick={addElement}
-              className="p-2 bg-black text-white rounded-full hover:bg-black/80 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+			{/* Floating minimalist Action Bar */}
+			<div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl border border-white/40 dark:border-zinc-800/50 shadow-2xl rounded-2xl animate-in slide-in-from-bottom-8 duration-500">
+				<div className="flex items-center gap-2 pr-2 border-r border-black/5 dark:border-white/5">
+					<input
+						type="text"
+						value={newText}
+						onChange={(e) => setNewText(e.target.value)}
+						placeholder="Add text..."
+						className="w-32 px-3 py-1.5 bg-black/5 dark:bg-white/5 rounded-lg focus:outline-none text-sm transition-all focus:w-48"
+						onKeyDown={(e) => e.key === "Enter" && addElement()}
+					/>
+					<button
+						type="button"
+						onClick={addElement}
+						className="p-1.5 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:scale-105 transition-transform"
+					>
+						<Plus className="w-4 h-4" />
+					</button>
+				</div>
 
-        <div className="flex flex-col gap-4">
-          <div className="relative border border-black/10 rounded-2xl overflow-hidden bg-white cursor-crosshair shadow-inner">
-            <canvas
-              ref={canvasRef}
-              width={GRID_COLS * CELL_SIZE}
-              height={GRID_ROWS * CELL_SIZE}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              className="w-full h-auto block"
-            />
-          </div>
+				{selectedId && (
+					<button
+						type="button"
+						onClick={deleteSelected}
+						className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+						title="Delete selected"
+					>
+						<Trash2 className="w-5 h-5" />
+					</button>
+				)}
 
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              {selectedId && (
-                <button
-                  type="button"
-                  onClick={deleteSelected}
-                  className="flex items-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 rounded-full transition-colors font-medium"
-                >
-                  <Trash2 className="w-4 h-4" /> Delete Selected
-                </button>
-              )}
-            </div>
+				<button
+					type="button"
+					onClick={generateAscii}
+					className="flex items-center gap-2 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-sm shadow-lg shadow-black/10"
+				>
+					<GripHorizontal className="w-4 h-4" /> Export
+				</button>
+			</div>
 
-            <button
-              type="button"
-              onClick={generateAscii}
-              className="flex items-center gap-2 px-6 py-2 bg-black text-white rounded-full hover:bg-black/80 transition-colors font-bold"
-            >
-              <GripHorizontal className="w-4 h-4" /> Export ASCII
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {ascii && (
-        <div className="bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl rounded-3xl p-6 dark:bg-zinc-900/60 dark:border-zinc-800/50 dark:shadow-2xl animate-in fade-in duration-500">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold flex items-center gap-2">
-              <FileText className="w-5 h-5 opacity-40" /> Generated ASCII
-            </h3>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={copyToClipboard}
-                className="p-2 hover:bg-black/5 rounded-lg transition-colors"
-                title="Copy to clipboard"
-              >
-                <Copy className="w-5 h-5" />
-              </button>
-              <button
-                type="button"
-                onClick={downloadAscii}
-                className="p-2 hover:bg-black/5 rounded-lg transition-colors"
-                title="Download as TXT"
-              >
-                <Download className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-          <pre className="bg-black text-white p-6 rounded-2xl overflow-x-auto font-mono text-[12px] leading-[12px] tracking-[0px]">
-            {ascii}
-          </pre>
-        </div>
-      )}
-    </div>
-  );
+			{/* ASCII Overlay Modal */}
+			{showAscii && (
+				<div className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
+					<div className="bg-white dark:bg-zinc-900 w-full max-w-4xl max-h-[80vh] rounded-3xl shadow-2xl overflow-hidden border border-black/5 dark:border-white/10 flex flex-col">
+						<div className="p-6 border-b border-black/5 dark:border-white/5 flex justify-between items-center">
+							<h3 className="font-bold flex items-center gap-2">
+								<FileText className="w-5 h-5 opacity-40" /> ASCII Manifest
+							</h3>
+							<div className="flex gap-2">
+								<button
+									type="button"
+									onClick={() => navigator.clipboard.writeText(ascii)}
+									className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors"
+								>
+									<Copy className="w-5 h-5" />
+								</button>
+								<button
+									type="button"
+									onClick={() => setShowAscii(false)}
+									className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors"
+								>
+									<X className="w-5 h-5" />
+								</button>
+							</div>
+						</div>
+						<div className="flex-1 overflow-auto p-6 bg-zinc-50 dark:bg-zinc-950">
+							<pre className="font-mono text-[10px] leading-[10px] tracking-[0px] whitespace-pre">
+								{ascii}
+							</pre>
+						</div>
+					</div>
+				</div>
+			)}
+		</div>
+	);
 };
 
 export default AsciiEditor;
