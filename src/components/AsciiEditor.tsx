@@ -63,12 +63,14 @@ const AsciiEditor: React.FC = () => {
 	const draw = useCallback(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
-		const ctx = canvas.getContext("2d");
+		const ctx = canvas.getContext("2d", { alpha: false }); // Optimization: opaque canvas
 		if (!ctx) return;
 
 		// Set canvas size to match window
-		canvas.width = window.innerWidth;
-		canvas.height = window.innerHeight;
+		if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+		}
 
 		// Background
 		ctx.fillStyle = "#ffffff";
@@ -78,34 +80,47 @@ const AsciiEditor: React.FC = () => {
 		ctx.save();
 		ctx.translate(viewOffset.x, viewOffset.y);
 
-		// Grid Lines
+		// --- OPTIMIZED GRID DRAWING ---
+		// We use a simpler approach: only draw visible lines
 		ctx.strokeStyle = "rgba(0,0,0,0.03)";
 		ctx.lineWidth = 1;
-
-		// Determine visible range to draw only what's on screen (infinite feel)
+		
 		const startCol = Math.floor(-viewOffset.x / visualCellSize);
 		const endCol = startCol + Math.ceil(canvas.width / visualCellSize) + 1;
 		const startRow = Math.floor(-viewOffset.y / visualCellSize);
 		const endRow = startRow + Math.ceil(canvas.height / visualCellSize) + 1;
 
+		ctx.beginPath();
 		for (let i = startCol; i <= endCol; i++) {
-			ctx.beginPath();
 			ctx.moveTo(i * visualCellSize, startRow * visualCellSize);
 			ctx.lineTo(i * visualCellSize, endRow * visualCellSize);
-			ctx.stroke();
 		}
 		for (let j = startRow; j <= endRow; j++) {
-			ctx.beginPath();
 			ctx.moveTo(startCol * visualCellSize, j * visualCellSize);
 			ctx.lineTo(endCol * visualCellSize, j * visualCellSize);
-			ctx.stroke();
 		}
+		ctx.stroke();
+
+		// --- SPATIAL CULLING ---
+		// Only draw elements that are within or overlap the viewport
+		const visibleElements = elements.filter(el => {
+			const elWidth = el.text.length * visualCellSize;
+			const screenX = el.x * visualCellSize + viewOffset.x;
+			const screenY = el.y * visualCellSize + viewOffset.y;
+			
+			return (
+				screenX + elWidth > 0 &&
+				screenX < canvas.width &&
+				screenY + visualCellSize > 0 &&
+				screenY < canvas.height
+			);
+		});
 
 		// Draw Elements
 		ctx.font = `${visualCellSize}px monospace`;
 		ctx.textBaseline = "top";
 
-		for (const el of elements) {
+		for (const el of visibleElements) {
 			const isSelected = el.id === selectedId;
 
 			if (isSelected) {
@@ -127,6 +142,9 @@ const AsciiEditor: React.FC = () => {
 			ctx.shadowOffsetY = 2 * zoom;
 
 			ctx.fillStyle = isSelected ? "#0066ff" : "#18181b";
+			// Performance: use fillText for the whole string if possible, 
+			// but we need exact grid alignment so we still do char-by-char.
+			// However, monospace font at exact sizes usually aligns well.
 			for (let i = 0; i < el.text.length; i++) {
 				ctx.fillText(el.text[i], (el.x + i) * visualCellSize + visualCellSize * 0.15, el.y * visualCellSize);
 			}
@@ -135,12 +153,21 @@ const AsciiEditor: React.FC = () => {
 		ctx.restore();
 		ctx.shadowColor = "transparent";
 		ctx.shadowBlur = 0;
-		ctx.shadowOffsetX = 0;
-		ctx.shadowOffsetY = 0;
 	}, [elements, selectedId, visualCellSize, zoom, viewOffset]);
 
+	// Use RequestAnimationFrame for smooth rendering
 	useEffect(() => {
-		draw();
+		let animationFrameId: number;
+
+		const render = () => {
+			draw();
+			animationFrameId = window.requestAnimationFrame(render);
+		};
+
+		animationFrameId = window.requestAnimationFrame(render);
+		return () => {
+			window.cancelAnimationFrame(animationFrameId);
+		};
 	}, [draw]);
 
 	const handleMouseUp = useCallback(() => {
