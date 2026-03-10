@@ -1,3 +1,5 @@
+import type { LucideIcon } from "lucide-react";
+
 export type ElementType = string;
 
 export interface BaseElement {
@@ -33,5 +35,5 @@ export interface AsciiExtension<
   create: (x: number, y: number, params?: C) => T;
   // UI related
   label: string;
-  icon: React.FC<{ className?: string }>;
+  icon: LucideIcon;
 }
