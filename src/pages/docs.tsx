@@ -1,6 +1,13 @@
+import {
+  Book,
+  ChevronLeft,
+  Code,
+  Layers,
+  Share2,
+  Terminal,
+} from "lucide-react";
 import Head from "next/head";
 import Link from "next/link";
-import { Book, ChevronLeft, Code, Layers, Share2, Terminal } from "lucide-react";
 
 export default function Docs() {
   return (
@@ -12,11 +19,16 @@ export default function Docs() {
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Navigation */}
         <div className="flex justify-between items-center">
-          <Link href="/" className="retro-button flex items-center gap-2 no-underline">
+          <Link
+            href="/"
+            className="retro-button flex items-center gap-2 no-underline"
+          >
             <ChevronLeft size={14} />
             <span>Back to Editor</span>
           </Link>
-          <div className="ui-label uppercase tracking-widest opacity-50">System Documentation v1.0</div>
+          <div className="ui-label uppercase tracking-widest opacity-50">
+            System Documentation v1.0
+          </div>
         </div>
 
         {/* Header Window */}
@@ -28,14 +40,19 @@ export default function Docs() {
             </div>
             <div className="flex gap-1">
               <div className="w-3 h-3 bg-[var(--os-bg)] border border-[var(--os-border-dark)]" />
-              <div className="w-3 h-3 bg-[var(--os-bg)] border border-[var(--os-border-dark)] flex items-center justify-center text-[8px]">✕</div>
+              <div className="w-3 h-3 bg-[var(--os-bg)] border border-[var(--os-border-dark)] flex items-center justify-center text-[8px]">
+                ✕
+              </div>
             </div>
           </div>
           <div className="p-6 space-y-4">
-            <h1 className="text-2xl font-bold tracking-tight uppercase">Extension System Guide</h1>
+            <h1 className="text-2xl font-bold tracking-tight uppercase">
+              Extension System Guide
+            </h1>
             <p className="opacity-80 leading-relaxed">
-              Genesis ASCII is built on a modular extension architecture. This document explains how to
-              develop, test, and integrate new drawing primitives into the platform.
+              Genesis ASCII is built on a modular extension architecture. This
+              document explains how to develop, test, and integrate new drawing
+              primitives into the platform.
             </p>
           </div>
         </div>
@@ -48,8 +65,9 @@ export default function Docs() {
               <span>Core Primitives</span>
             </div>
             <p className="text-xs leading-relaxed">
-              Every element on the grid is an extension. This includes basic text, boxes, and even
-              complex vector paths. This abstraction allows for infinite expansion of the toolkit.
+              Every element on the grid is an extension. This includes basic
+              text, boxes, and even complex vector paths. This abstraction
+              allows for infinite expansion of the toolkit.
             </p>
           </div>
           <div className="window-raised p-4 space-y-3">
@@ -58,8 +76,9 @@ export default function Docs() {
               <span>Registry System</span>
             </div>
             <p className="text-xs leading-relaxed">
-              Extensions are registered in a central registry, making them instantly available to the
-              UI, the rendering engine, and the ASCII synchronization layer.
+              Extensions are registered in a central registry, making them
+              instantly available to the UI, the rendering engine, and the ASCII
+              synchronization layer.
             </p>
           </div>
         </div>
@@ -95,10 +114,12 @@ export default function Docs() {
             <Terminal size={16} />
             <span>Implementation Example: "Cross" Extension</span>
           </h2>
-          
+
           <div className="window-sunken p-6 space-y-6">
             <div className="space-y-4">
-              <h3 className="font-bold text-xs uppercase border-b border-[var(--os-border-dark)] pb-1">1. Define the Data Model</h3>
+              <h3 className="font-bold text-xs uppercase border-b border-[var(--os-border-dark)] pb-1">
+                1. Define the Data Model
+              </h3>
               <div className="terminal-output p-3 text-xs">
                 <pre>{`interface CrossElement extends BaseElement {
   type: "cross";
@@ -108,7 +129,9 @@ export default function Docs() {
             </div>
 
             <div className="space-y-4">
-              <h3 className="font-bold text-xs uppercase border-b border-[var(--os-border-dark)] pb-1">2. Implement the Logic</h3>
+              <h3 className="font-bold text-xs uppercase border-b border-[var(--os-border-dark)] pb-1">
+                2. Implement the Logic
+              </h3>
               <div className="terminal-output p-3 text-xs max-h-64 overflow-y-auto">
                 <pre>{`export const crossExtension: AsciiExtension<CrossElement> = {
   type: "cross",
@@ -133,8 +156,12 @@ export default function Docs() {
             </div>
 
             <div className="space-y-4">
-              <h3 className="font-bold text-xs uppercase border-b border-[var(--os-border-dark)] pb-1">3. Register Globally</h3>
-              <p className="text-xs opacity-70">Add the export to <code>src/extensions/registry.ts</code>:</p>
+              <h3 className="font-bold text-xs uppercase border-b border-[var(--os-border-dark)] pb-1">
+                3. Register Globally
+              </h3>
+              <p className="text-xs opacity-70">
+                Add the export to <code>src/extensions/registry.ts</code>:
+              </p>
               <div className="terminal-output p-3 text-xs">
                 <pre>{`export const extensions = {
   text: textExtension,
@@ -148,15 +175,17 @@ export default function Docs() {
 
         {/* Footer */}
         <div className="text-center p-8">
-          <p className="ui-label opacity-40">GENESIS ASCII - BUILT FOR THE RETRO FUTURE</p>
+          <p className="ui-label opacity-40">
+            https://github.com/cocodrilette/ascii-canva
+          </p>
         </div>
       </div>
 
-      <style jsx global>{\`
+      <style jsx global>{`
         body {
           overflow: auto !important;
         }
-      \`}</style>
+      `}</style>
     </div>
   );
 }

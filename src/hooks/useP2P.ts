@@ -191,7 +191,7 @@ export const useP2P = (initialChannelId: string, onData?: (data: Uint8Array) => 
 
   const sendData = (data: Uint8Array) => {
     if (dataChannel.current?.readyState === "open") {
-      dataChannel.current.send(data);
+      dataChannel.current.send(data as any);
     }
   };
 
