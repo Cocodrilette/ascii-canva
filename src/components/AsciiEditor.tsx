@@ -91,6 +91,7 @@ const AsciiEditor: React.FC = () => {
   const [viewOffset, setViewOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [isLoaded, setIsLoaded] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -268,11 +269,14 @@ const AsciiEditor: React.FC = () => {
         console.error("Failed to restore state");
       }
     }
+    setIsLoaded(true);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("ascii-canvas-state", JSON.stringify(elements));
-  }, [elements]);
+    if (isLoaded) {
+      localStorage.setItem("ascii-canvas-state", JSON.stringify(elements));
+    }
+  }, [elements, isLoaded]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
