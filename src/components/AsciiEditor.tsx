@@ -254,13 +254,13 @@ const AsciiEditor: React.FC = () => {
   }, [status, setChannelId, elements.length > 0]);
 
   useEffect(() => {
-    if (elements.length > 0) {
+    if (elements.length > 0 && !isDragging && !isResizing && !isPanning) {
       const centerEl = elements.find((el) => el.isCenter);
       if (centerEl) {
         centerView(elements);
       }
     }
-  }, [elements, centerView]); // Run when elements or centerView change
+  }, [elements, centerView, isDragging, isResizing, isPanning]); // Run when elements or centerView change
 
   // Persistence
   useEffect(() => {
