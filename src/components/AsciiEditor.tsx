@@ -4,6 +4,7 @@ import {
   Download,
   FileText,
   GripHorizontal,
+  Layers,
   Terminal,
   Trash2,
   Users,
@@ -21,6 +22,8 @@ import { useRealtime } from "../hooks/useRealtime";
 import { isInside } from "../utils/geometry";
 // Removed packElements and unpackElements imports as we use JSON now
 import CollabModal from "./CollabModal";
+import LayerManager from "./LayerManager";
+import Taskbar from "./Taskbar";
 
 const CELL_SIZE = 14;
 const MIN_ZOOM = 0.5;
@@ -69,6 +72,7 @@ const AsciiEditor: React.FC = () => {
   const isRemoteUpdate = useRef(false);
 
   const [isDragging, setIsDragging] = useState(false);
+  const hasDragged = useRef(false);
 
   const [isResizing, setIsResizing] = useState(false);
   const [draggedPointIndex, setDraggedPointIndex] = useState<number | null>(
@@ -80,6 +84,7 @@ const AsciiEditor: React.FC = () => {
   const [ascii, setAscii] = useState("");
   const [showAscii, setShowAscii] = useState(false);
   const [showCollab, setShowCollab] = useState(false);
+  const [showExplorer, setShowExplorer] = useState(false);
   const [newText, setNewText] = useState("");
   const [zoom, setZoom] = useState(1);
   const [touchDist, setTouchDist] = useState<number | null>(null);
@@ -311,6 +316,7 @@ const AsciiEditor: React.FC = () => {
 
     // Culling and Rendering
     const visibleElements = elements.filter((el) => {
+      if (el.hidden) return false;
       const ext = getExtension(el.type);
       const b = ext.getBounds(el);
       const screenX = b.left * visualCellSize + viewOffset.x;
@@ -325,12 +331,7 @@ const AsciiEditor: React.FC = () => {
       );
     });
 
-    const sortedElements = [...visibleElements].sort((a, b) => {
-      if (a.type === b.type) return 0;
-      return a.type === "box" ? -1 : 1;
-    });
-
-    for (const el of sortedElements) {
+    for (const el of visibleElements) {
       const ext = getExtension(el.type);
       ext.render(ctx, el, el.id === selectedId, visualCellSize);
     }
@@ -359,9 +360,9 @@ const AsciiEditor: React.FC = () => {
   const handleDoubleClick = (e: React.MouseEvent) => {
     const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
     const clickedEl = [...elements]
-      .sort((a, b) => (a.type === b.type ? 0 : a.type === "box" ? -1 : 1))
       .reverse()
       .find((el) => {
+        if (el.locked || el.hidden) return false;
         const ext = getExtension(el.type);
         const b = ext.getBounds(el);
         return (
@@ -372,7 +373,7 @@ const AsciiEditor: React.FC = () => {
         );
       });
 
-    if (clickedEl?.type === "text") {
+    if (clickedEl?.type === "text" && !hasDragged.current) {
       setSelectedId(clickedEl.id);
       setIsEditing(true);
     }
@@ -410,12 +411,9 @@ const AsciiEditor: React.FC = () => {
 
       // Logic to select element under right-click if not already selected
       const clickedEl = [...elements]
-        .sort((a, b) => {
-          if (a.type === b.type) return 0;
-          return a.type === "box" ? -1 : 1;
-        })
         .reverse()
         .find((el) => {
+          if (el.locked || el.hidden) return false;
           const ext = getExtension(el.type);
           const b = ext.getBounds(el);
           return (
@@ -573,6 +571,7 @@ const AsciiEditor: React.FC = () => {
         const dx = gridX - dragOffset.x;
         const dy = gridY - dragOffset.y;
         if (dx !== 0 || dy !== 0) {
+          hasDragged.current = true;
           const movedIds = [selectedId, ...capturedIds];
           setElements((prev) =>
             prev.map((el) => {
@@ -880,6 +879,8 @@ const AsciiEditor: React.FC = () => {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     closeContextMenu();
+    setIsEditing(false);
+    hasDragged.current = false;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -899,6 +900,7 @@ const AsciiEditor: React.FC = () => {
       ) {
         pushToHistory();
         setIsResizing(true);
+        hasDragged.current = true;
         return;
       }
     }
@@ -935,6 +937,7 @@ const AsciiEditor: React.FC = () => {
           }
           pushToHistory();
           setDraggedPointIndex(i);
+          hasDragged.current = true;
           return;
         }
       }
@@ -942,12 +945,9 @@ const AsciiEditor: React.FC = () => {
 
     // Selection logic
     const clickedEl = [...elements]
-      .sort((a, b) => {
-        if (a.type === b.type) return 0;
-        return a.type === "box" ? -1 : 1;
-      })
       .reverse()
       .find((el) => {
+        if (el.locked || el.hidden) return false;
         const ext = getExtension(el.type);
         const b = ext.getBounds(el);
         return (
@@ -985,6 +985,8 @@ const AsciiEditor: React.FC = () => {
       setTouchDist(dist);
     } else if (e.touches.length === 1) {
       closeContextMenu();
+      setIsEditing(false);
+      hasDragged.current = false;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
@@ -1007,6 +1009,7 @@ const AsciiEditor: React.FC = () => {
         ) {
           pushToHistory();
           setIsResizing(true);
+          hasDragged.current = true;
           return;
         }
       }
@@ -1024,17 +1027,15 @@ const AsciiEditor: React.FC = () => {
           ) {
             pushToHistory();
             setDraggedPointIndex(i);
+            hasDragged.current = true;
             return;
           }
         }
       }
       const clickedEl = [...elements]
-        .sort((a, b) => {
-          if (a.type === b.type) return 0;
-          return a.type === "box" ? -1 : 1;
-        })
         .reverse()
         .find((el) => {
+          if (el.locked || el.hidden) return false;
           const ext = getExtension(el.type);
           const b = ext.getBounds(el);
           return (
@@ -1166,6 +1167,26 @@ const AsciiEditor: React.FC = () => {
 
   const selectedElement = elements.find((el) => el.id === selectedId);
 
+  const selectAndCenterElement = useCallback(
+    (id: string | null) => {
+      setSelectedId(id);
+      if (id) {
+        const el = elements.find((e) => e.id === id);
+        if (el) {
+          const ext = getExtension(el.type);
+          const b = ext.getBounds(el);
+          const centerX = (b.left + b.right) / 2;
+          const centerY = (b.top + b.bottom) / 2;
+          setViewOffset({
+            x: window.innerWidth / 2 - centerX * visualCellSize,
+            y: window.innerHeight / 2 - centerY * visualCellSize,
+          });
+        }
+      }
+    },
+    [elements, visualCellSize],
+  );
+
   return (
     <div className="fixed inset-0 overflow-hidden bg-(--os-bg) select-none">
       <canvas
@@ -1174,7 +1195,7 @@ const AsciiEditor: React.FC = () => {
         onDoubleClick={handleDoubleClick}
         onTouchStart={handleTouchStart}
         onContextMenu={handleContextMenu}
-        className="fixed inset-x-0 top-16 bottom-0 w-full block cursor-default bg-white"
+        className="fixed inset-x-0 top-16 bottom-8 w-full block cursor-default bg-white"
       />
 
       {isEditing && selectedElement?.type === "text" && (
@@ -1294,6 +1315,13 @@ const AsciiEditor: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowExplorer(!showExplorer)}
+              className={`retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] ${showExplorer ? "bg-blue-100 border-blue-600" : ""}`}
+            >
+              <Layers size={12} /> Layers
+            </button>
             <button
               type="button"
               onClick={() => setShowCollab(true)}
@@ -1433,6 +1461,18 @@ const AsciiEditor: React.FC = () => {
         status={status}
         onStartHost={startCollaboration}
       />
+
+      <LayerManager
+        isOpen={showExplorer}
+        onClose={() => setShowExplorer(false)}
+        elements={elements}
+        setElements={setElements}
+        selectedId={selectedId}
+        setSelectedId={selectAndCenterElement}
+        onDeleteElement={deleteSelected}
+      />
+
+      <Taskbar />
     </div>
   );
 };

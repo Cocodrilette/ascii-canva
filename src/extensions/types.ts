@@ -8,6 +8,8 @@ export interface BaseElement {
   x: number; // grid x
   y: number; // grid y
   isCenter?: boolean;
+  hidden?: boolean;
+  locked?: boolean;
 }
 
 export interface AsciiExtension<
