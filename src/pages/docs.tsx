@@ -85,7 +85,7 @@ export default function Docs() {
             <span>Home</span>
           </Link>
           <div className="ui-label uppercase tracking-widest opacity-50">
-            System Documentation v1.0
+            System Documentation v{process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0"}
           </div>
         </div>
 

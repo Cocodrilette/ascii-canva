@@ -27,6 +27,7 @@
     "@types/react-dom": "^19",
     "supabase": "^2.77.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vercel": "^50.29.0"
   }
 }
