@@ -1281,6 +1281,52 @@ const AsciiEditor: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const exportToImage = () => {
+    if (elements.length === 0) return;
+
+    // 1. Calculate bounds
+    const registeredElements = elements.filter(el => hasExtension(el.type));
+    if (registeredElements.length === 0) return;
+
+    const bounds = registeredElements.map((el) => getExtension(el.type).getBounds(el));
+    const minX = Math.min(...bounds.map((b) => b.left));
+    const maxX = Math.max(...bounds.map((b) => b.right));
+    const minY = Math.min(...bounds.map((b) => b.top));
+    const maxY = Math.max(...bounds.map((b) => b.bottom));
+
+    const width = (maxX - minX + 2) * CELL_SIZE; // +2 for padding
+    const height = (maxY - minY + 2) * CELL_SIZE;
+
+    // 2. Setup high-fidelity offscreen canvas (2x for crispness)
+    const scale = 2;
+    const offscreen = document.createElement("canvas");
+    offscreen.width = width * scale;
+    offscreen.height = height * scale;
+    const ctx = offscreen.getContext("2d");
+    if (!ctx) return;
+
+    // 3. Render
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.translate(
+      (-minX + 1) * CELL_SIZE,
+      (-minY + 1) * CELL_SIZE
+    );
+
+    for (const el of registeredElements) {
+      const ext = getExtension(el.type);
+      ext.render(ctx, el, false, CELL_SIZE);
+    }
+
+    // 4. Download
+    const link = document.createElement("a");
+    link.download = `ascii_canva_${new Date().getTime()}.png`;
+    link.href = offscreen.toDataURL("image/png");
+    link.click();
+  };
+
   const updateSelectedText = (text: string) => {
     setElements((prev) =>
       prev.map((el) =>
@@ -1460,6 +1506,13 @@ const AsciiEditor: React.FC = () => {
                 className="retro-button px-3 py-1 text-[10px] font-bold text-[var(--os-titlebar)] border-blue-600"
               >
                 Export ASCII
+              </button>
+              <button
+                type="button"
+                onClick={exportToImage}
+                className="retro-button px-3 py-1 text-[10px] font-bold text-green-700 border-green-700"
+              >
+                Export IMG
               </button>
             </div>
 
