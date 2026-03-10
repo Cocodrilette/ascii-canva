@@ -779,15 +779,16 @@ const AsciiEditor: React.FC = () => {
             }),
           );
         } else if (isDragging && selectedId) {
-          const dx = gridX - dragOffset.x;
-          const dy = gridY - dragOffset.y;
+          const dx = gridX - dragOffset.current.x;
+          const dy = gridY - dragOffset.current.y;
           if (dx !== 0 || dy !== 0) {
+            hasDragged.current = true;
             const movedIds = [selectedId, ...capturedIds];
             setElements((prev) =>
               prev.map((el) => {
                 if (movedIds.includes(el.id)) {
-                  if (el.type === "vector") {
-                    const vec = el as VectorElement;
+                  if (el.type === "vector" || el.type === "line") {
+                    const vec = el as VectorElement | LineElement;
                     const newPoints = vec.points.map((p) => ({
                       x: p.x + dx,
                       y: p.y + dy,
@@ -801,8 +802,8 @@ const AsciiEditor: React.FC = () => {
                   }
                   return { ...el, x: el.x + dx, y: el.y + dy };
                 }
-                if (el.type === "vector") {
-                  const vec = el as VectorElement;
+                if (el.type === "vector" || el.type === "line") {
+                  const vec = el as VectorElement | LineElement;
                   let changed = false;
                   const newPoints = [...vec.points];
                   if (
@@ -835,7 +836,7 @@ const AsciiEditor: React.FC = () => {
                 return el;
               }),
             );
-            setDragOffset({ x: gridX, y: gridY });
+            dragOffset.current = { x: gridX, y: gridY };
           }
         } else if (isPanning) {
           setViewOffset({
