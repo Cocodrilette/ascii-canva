@@ -14,6 +14,7 @@ import Link from "next/link";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BoxElement } from "../extensions/builtin/box";
+import type { LineElement } from "../extensions/builtin/line";
 import type { TextElement } from "../extensions/builtin/text";
 import type { VectorElement } from "../extensions/builtin/vector";
 import { getAllExtensions, getExtension } from "../extensions/registry";
@@ -403,10 +404,10 @@ const AsciiEditor: React.FC = () => {
 
       const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
 
-      // Check if right-clicking a vector point handle first
+      // Check if right-clicking a vector/line point handle first
       const selected = elements.find((el) => el.id === selectedId);
-      if (selected?.type === "vector") {
-        const vec = selected as VectorElement;
+      if (selected?.type === "vector" || selected?.type === "line") {
+        const vec = selected as VectorElement | LineElement;
         for (let i = 0; i < vec.points.length; i++) {
           const p = vec.points[i];
           const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
@@ -458,8 +459,8 @@ const AsciiEditor: React.FC = () => {
       pushToHistory();
       setElements((prev) =>
         prev.map((el) => {
-          if (el.id === elementId && el.type === "vector") {
-            const vec = el as VectorElement;
+          if (el.id === elementId && (el.type === "vector" || el.type === "line")) {
+            const vec = el as VectorElement | LineElement;
             if (vec.points.length <= 2) return el; // Minimum 2 points
             const newPoints = [...vec.points];
             newPoints.splice(pointIndex, 1);
@@ -525,8 +526,8 @@ const AsciiEditor: React.FC = () => {
       } else if (draggedPointIndex !== null && selectedId) {
         setElements((prev) =>
           prev.map((el) => {
-            if (el.id === selectedId && el.type === "vector") {
-              const vec = el as VectorElement;
+            if (el.id === selectedId && (el.type === "vector" || el.type === "line")) {
+              const vec = el as VectorElement | LineElement;
               const isStart = draggedPointIndex === 0;
               const isEnd = draggedPointIndex === vec.points.length - 1;
 
@@ -539,6 +540,7 @@ const AsciiEditor: React.FC = () => {
                   (other) =>
                     other.id !== selectedId &&
                     other.type !== "vector" &&
+                    other.type !== "line" &&
                     gridX >= getExtension(other.type).getBounds(other).left &&
                     gridX < getExtension(other.type).getBounds(other).right &&
                     gridY >= getExtension(other.type).getBounds(other).top &&
@@ -590,8 +592,8 @@ const AsciiEditor: React.FC = () => {
           setElements((prev) =>
             prev.map((el) => {
               if (movedIds.includes(el.id)) {
-                if (el.type === "vector") {
-                  const vec = el as VectorElement;
+                if (el.type === "vector" || el.type === "line") {
+                  const vec = el as VectorElement | LineElement;
                   const newPoints = vec.points.map((p) => ({
                     x: p.x + dx,
                     y: p.y + dy,
@@ -605,8 +607,8 @@ const AsciiEditor: React.FC = () => {
                 }
                 return { ...el, x: el.x + dx, y: el.y + dy };
               }
-              if (el.type === "vector") {
-                const vec = el as VectorElement;
+              if (el.type === "vector" || el.type === "line") {
+                const vec = el as VectorElement | LineElement;
                 let changed = false;
                 const newPoints = [...vec.points];
                 if (
@@ -919,8 +921,8 @@ const AsciiEditor: React.FC = () => {
       }
     }
 
-    if (selected?.type === "vector") {
-      const vec = selected as VectorElement;
+    if (selected?.type === "vector" || selected?.type === "line") {
+      const vec = selected as VectorElement | LineElement;
       for (let i = 0; i < vec.points.length; i++) {
         const p = vec.points[i];
         const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
@@ -939,7 +941,7 @@ const AsciiEditor: React.FC = () => {
             setElements((prev) =>
               prev.map((el) => {
                 if (el.id === selectedId) {
-                  const v = el as VectorElement;
+                  const v = el as VectorElement | LineElement;
                   const newPoints = [...v.points];
                   newPoints.splice(i + 1, 0, newP);
                   return { ...v, points: newPoints };
@@ -1028,8 +1030,8 @@ const AsciiEditor: React.FC = () => {
         }
       }
 
-      if (selected?.type === "vector") {
-        const vec = selected as VectorElement;
+      if (selected?.type === "vector" || selected?.type === "line") {
+        const vec = selected as VectorElement | LineElement;
         for (let i = 0; i < vec.points.length; i++) {
           const p = vec.points[i];
           const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
