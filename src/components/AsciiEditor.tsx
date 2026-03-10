@@ -1,4 +1,12 @@
-import { Copy, Download, FileText, GripHorizontal, Trash2, Users, Wifi, WifiOff } from "lucide-react";
+import {
+  Copy,
+  Download,
+  FileText,
+  GripHorizontal,
+  Trash2,
+  Users,
+  Wifi,
+} from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BoxElement } from "../extensions/builtin/box";
@@ -6,8 +14,8 @@ import type { TextElement } from "../extensions/builtin/text";
 import type { VectorElement } from "../extensions/builtin/vector";
 import { getAllExtensions, getExtension } from "../extensions/registry";
 import type { BaseElement } from "../extensions/types";
-import { useP2P } from "../hooks/useP2P";
-import { packElements, unpackElements } from "../utils/sync";
+import { useRealtime } from "../hooks/useRealtime";
+// Removed packElements and unpackElements imports as we use JSON now
 import CollabModal from "./CollabModal";
 
 const CELL_SIZE = 14;
@@ -32,7 +40,7 @@ const AsciiEditor: React.FC = () => {
     getExtension("text").create(100, 100, { text: "GENESIS ASCII" }),
     getExtension("box").create(100, 100, { width: 20, height: 6 }),
   ]);
-  const [history, setHistory] = useState<BaseElement[][]>([]);
+  const [_history, setHistory] = useState<BaseElement[][]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const isRemoteUpdate = useRef(false);
@@ -106,40 +114,47 @@ const AsciiEditor: React.FC = () => {
   }, [undo]);
 
   // P2P Setup
-  const centerView = useCallback((els: BaseElement[]) => {
-    const centerEl = els.find((el) => el.isCenter);
-    if (centerEl) {
-      const x = window.innerWidth / 2 - centerEl.x * visualCellSize;
-      const y = window.innerHeight / 2 - centerEl.y * visualCellSize;
-      setViewOffset({ x, y });
-    }
-  }, [visualCellSize]);
-
-  const onRemoteData = useCallback((data: Uint8Array) => {
-    isRemoteUpdate.current = true;
-    const remoteElements = unpackElements(data);
-    
-    setElements((prev) => {
-      const prevCenter = prev.find(e => e.isCenter);
-      const nextCenter = remoteElements.find(e => e.isCenter);
-      if (nextCenter && (!prevCenter || prevCenter.id !== nextCenter.id || prevCenter.x !== nextCenter.x)) {
-         centerView(remoteElements);
+  const centerView = useCallback(
+    (els: BaseElement[]) => {
+      const centerEl = els.find((el) => el.isCenter);
+      if (centerEl) {
+        const x = window.innerWidth / 2 - centerEl.x * visualCellSize;
+        const y = window.innerHeight / 2 - centerEl.y * visualCellSize;
+        setViewOffset({ x, y });
       }
-      return remoteElements;
-    });
+    },
+    [visualCellSize],
+  );
 
-    setTimeout(() => { isRemoteUpdate.current = false; }, 100);
-  }, [centerView]);
+  const onRemoteData = useCallback(
+    (remoteElements: BaseElement[]) => {
+      isRemoteUpdate.current = true;
 
-  const onConnect = useCallback((isHost: boolean, send: (data: Uint8Array) => void) => {
-    if (isHost) {
-      console.log("P2P: Initializing state sync (Host)...");
-      const packed = packElements(elements);
-      send(packed);
-    }
-  }, [elements]);
+      setElements((prev) => {
+        const prevCenter = prev.find((e) => e.isCenter);
+        const nextCenter = remoteElements.find((e) => e.isCenter);
+        if (
+          nextCenter &&
+          (!prevCenter ||
+            prevCenter.id !== nextCenter.id ||
+            prevCenter.x !== nextCenter.x)
+        ) {
+          centerView(remoteElements);
+        }
+        return remoteElements;
+      });
 
-  const { peerId, channelId, status, isHost, startHost, startJoin, sendData } = useP2P("", onRemoteData, onConnect);
+      setTimeout(() => {
+        isRemoteUpdate.current = false;
+      }, 100);
+    },
+    [centerView],
+  );
+
+  const { peerId, channelId, status, setChannelId, sendData } = useRealtime(
+    "",
+    onRemoteData,
+  );
 
   const setCenter = useCallback(() => {
     if (!selectedId) return;
@@ -155,16 +170,27 @@ const AsciiEditor: React.FC = () => {
   // Sync elements to peers (Bi-directional)
   useEffect(() => {
     if (status === "connected" && !isRemoteUpdate.current) {
-      const packed = packElements(elements);
-      sendData(packed);
+      sendData(elements);
     }
+  }, [elements, status, sendData]);
+
+  // Handle state request from new joiners
+  useEffect(() => {
+    const handleRequestState = () => {
+      if (status === "connected") {
+        sendData(elements);
+      }
+    };
+    window.addEventListener("canvas:request-state", handleRequestState);
+    return () =>
+      window.removeEventListener("canvas:request-state", handleRequestState);
   }, [elements, status, sendData]);
 
   const startCollaboration = () => {
     const id = Math.random().toString(36).substr(2, 6).toUpperCase();
     const newUrl = `${window.location.origin}${window.location.pathname}?join=${id}`;
     window.history.pushState({}, "", newUrl);
-    startHost(id);
+    setChannelId(id);
   };
 
   useEffect(() => {
@@ -172,19 +198,25 @@ const AsciiEditor: React.FC = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const joinId = urlParams.get("join");
     if (joinId && status === "idle") {
-      const hasContent = elements.length > 2 || (elements.length > 0 && elements[0].type !== "text"); // Simple heuristic
+      const hasContent =
+        elements.length > 2 ||
+        (elements.length > 0 && elements[0].type !== "text"); // Simple heuristic
       if (hasContent) {
-        if (window.confirm("Joining a session will override your local drawing. Proceed?")) {
-          startJoin(joinId);
+        if (
+          window.confirm(
+            "Joining a session will override your local drawing. Proceed?",
+          )
+        ) {
+          setChannelId(joinId);
         } else {
           // Clean URL to prevent re-triggering
           window.history.pushState({}, "", window.location.pathname);
         }
       } else {
-        startJoin(joinId);
+        setChannelId(joinId);
       }
     }
-  }, [status, startJoin, elements]);
+  }, [status, setChannelId, elements]);
 
   useEffect(() => {
     if (elements.length > 0) {
@@ -193,7 +225,7 @@ const AsciiEditor: React.FC = () => {
         centerView(elements);
       }
     }
-  }, []); // Run once on mount
+  }, [elements, centerView]); // Run when elements or centerView change
 
   // Persistence
   useEffect(() => {
@@ -201,7 +233,7 @@ const AsciiEditor: React.FC = () => {
     if (saved) {
       try {
         setElements(JSON.parse(saved));
-      } catch (e) {
+      } catch (_e) {
         console.error("Failed to restore state");
       }
     }
@@ -305,7 +337,12 @@ const AsciiEditor: React.FC = () => {
       .find((el) => {
         const ext = getExtension(el.type);
         const b = ext.getBounds(el);
-        return gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom;
+        return (
+          gridX >= b.left &&
+          gridX < b.right &&
+          gridY >= b.top &&
+          gridY < b.bottom
+        );
       });
 
     if (clickedEl?.type === "text") {
@@ -1009,7 +1046,7 @@ const AsciiEditor: React.FC = () => {
         const loadedElements = JSON.parse(event.target?.result as string);
         pushToHistory();
         setElements(loadedElements);
-      } catch (err) {
+      } catch (_err) {
         alert("Error: Invalid project file.");
       }
     };
@@ -1085,13 +1122,23 @@ const AsciiEditor: React.FC = () => {
 
       {isEditing && selectedElement?.type === "text" && (
         <textarea
-          autoFocus
           className="fixed z-[200] bg-white border-2 border-[var(--os-border-dark)] font-mono resize-none outline-none overflow-hidden shadow-[2px_2px_0_rgba(0,0,0,0.5)]"
           style={{
             left: selectedElement.x * visualCellSize + viewOffset.x,
             top: selectedElement.y * visualCellSize + viewOffset.y,
-            width: Math.max(...(selectedElement as TextElement).text.split("\n").map(l => l.length), 1) * visualCellSize + 10,
-            height: (selectedElement as TextElement).text.split("\n").length * visualCellSize + 10,
+            width:
+              Math.max(
+                ...(selectedElement as TextElement).text
+                  .split("\n")
+                  .map((l) => l.length),
+                1,
+              ) *
+                visualCellSize +
+              10,
+            height:
+              (selectedElement as TextElement).text.split("\n").length *
+                visualCellSize +
+              10,
             fontSize: `${visualCellSize}px`,
             lineHeight: `${visualCellSize}px`,
             padding: "2px",
@@ -1119,7 +1166,11 @@ const AsciiEditor: React.FC = () => {
               className={`retro-button px-1 py-0 text-[10px] flex items-center gap-1 ${status === "connected" ? "text-green-600 font-bold" : ""}`}
               title="Collaborate Live"
             >
-              {status === "connected" ? <Wifi className="w-2 h-2" /> : <Users className="w-2 h-2" />}
+              {status === "connected" ? (
+                <Wifi className="w-2 h-2" />
+              ) : (
+                <Users className="w-2 h-2" />
+              )}
               {status === "connected" ? `SYNC: ${channelId}` : "Collab"}
             </button>
             <button
@@ -1169,7 +1220,7 @@ const AsciiEditor: React.FC = () => {
                 <button
                   type="button"
                   onClick={setCenter}
-                  className={`retro-button flex items-center gap-1 ${elements.find(e => e.id === selectedId)?.isCenter ? "text-blue-600 font-bold" : ""}`}
+                  className={`retro-button flex items-center gap-1 ${elements.find((e) => e.id === selectedId)?.isCenter ? "text-blue-600 font-bold" : ""}`}
                   title="Set as View Center"
                 >
                   <GripHorizontal className="w-3 h-3" /> Center
