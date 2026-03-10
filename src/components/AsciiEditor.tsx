@@ -1,4 +1,5 @@
 import {
+  Book,
   Copy,
   Download,
   FileText,
@@ -7,6 +8,7 @@ import {
   Users,
   Wifi,
 } from "lucide-react";
+import Link from "next/link";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BoxElement } from "../extensions/builtin/box";
@@ -1190,6 +1192,13 @@ const AsciiEditor: React.FC = () => {
                 accept=".json"
               />
             </label>
+            <Link
+              href="/docs"
+              className="retro-button px-1 py-0 text-[10px] no-underline flex items-center gap-1"
+              title="Documentation"
+            >
+              <Book className="w-2 h-2" /> Docs
+            </Link>
             <button
               type="button"
               className="retro-button px-1 py-0 leading-none h-4 w-4 flex items-center justify-center font-bold"

@@ -8,10 +8,62 @@ import {
 } from "lucide-react";
 import Head from "next/head";
 import Link from "next/link";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { ghcolors as theme } from "react-syntax-highlighter/dist/cjs/styles/prism";
+
+function ModernCodeBlock({
+  code,
+  language = "typescript",
+}: {
+  code: string;
+  language?: string;
+}) {
+  return (
+    <div className="relative group my-6">
+      {/* Subtle modern glow */}
+      <div className="absolute -inset-1 bg-linear-to-r from-gray-200 to-gray-100 rounded-xl blur-sm opacity-50"></div>
+
+      <div className="relative bg-[#f6f8fa] rounded-lg border border-gray-200 overflow-hidden shadow-xl">
+        {/* Modern GitHub-style header */}
+        <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
+          <div className="flex gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">
+              {language}
+            </div>
+            <div className="w-px h-3 bg-gray-200"></div>
+            <Code size={10} className="text-gray-400" />
+          </div>
+        </div>
+
+        <div className="p-0">
+          <SyntaxHighlighter
+            language={language}
+            style={theme}
+            customStyle={{
+              margin: 0,
+              padding: "1.5rem",
+              background: "transparent",
+              fontSize: "12px",
+              lineHeight: "1.6",
+              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+            }}
+          >
+            {code}
+          </SyntaxHighlighter>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Docs() {
   return (
-    <div className="min-h-screen bg-[var(--os-bg)] p-8 overflow-auto">
+    <div className="min-h-screen bg-(--os-bg) p-8 overflow-auto">
       <Head>
         <title>Genesis ASCII - Documentation</title>
       </Head>
@@ -39,8 +91,8 @@ export default function Docs() {
               <span>README.TXT</span>
             </div>
             <div className="flex gap-1">
-              <div className="w-3 h-3 bg-[var(--os-bg)] border border-[var(--os-border-dark)]" />
-              <div className="w-3 h-3 bg-[var(--os-bg)] border border-[var(--os-border-dark)] flex items-center justify-center text-[8px]">
+              <div className="w-3 h-3 bg-(--os-bg) border border-(--os-border-dark)" />
+              <div className="w-3 h-3 bg-(--os-bg) border border-(--os-border-dark) flex items-center justify-center text-[8px]">
                 ✕
               </div>
             </div>
@@ -60,7 +112,7 @@ export default function Docs() {
         {/* Core Concepts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="window-raised p-4 space-y-3">
-            <div className="flex items-center gap-2 font-bold uppercase text-xs border-b border-[var(--os-border-dark)] pb-2 mb-4">
+            <div className="flex items-center gap-2 font-bold uppercase text-xs border-b border-(--os-border-dark) pb-2 mb-4">
               <Layers size={14} />
               <span>Core Primitives</span>
             </div>
@@ -71,7 +123,7 @@ export default function Docs() {
             </p>
           </div>
           <div className="window-raised p-4 space-y-3">
-            <div className="flex items-center gap-2 font-bold uppercase text-xs border-b border-[var(--os-border-dark)] pb-2 mb-4">
+            <div className="flex items-center gap-2 font-bold uppercase text-xs border-b border-(--os-border-dark) pb-2 mb-4">
               <Share2 size={14} />
               <span>Registry System</span>
             </div>
@@ -91,8 +143,9 @@ export default function Docs() {
               <span>EXTENSIONS/TYPES.TS</span>
             </div>
           </div>
-          <div className="terminal-output p-4 overflow-x-auto text-xs leading-normal">
-            <pre>{`export interface AsciiExtension<T extends BaseElement, C = unknown> {
+          <div className="p-4 bg-white/50">
+            <ModernCodeBlock
+              code={`export interface AsciiExtension<T extends BaseElement, C = unknown> {
   type: string;          // Unique ID
   label: string;         // UI Display name
   icon: React.FC;        // UI Icon
@@ -104,7 +157,8 @@ export default function Docs() {
   render: (ctx: CanvasRenderingContext2D, el: T, isSelected: boolean, size: number) => void;
   getBounds: (element: T) => { left: number, top: number, right: number, bottom: number };
   toAscii: (element: T, grid: string[][], offset: { x: number, y: number }) => void;
-}`}</pre>
+}`}
+            />
           </div>
         </div>
 
@@ -117,23 +171,23 @@ export default function Docs() {
 
           <div className="window-sunken p-6 space-y-6">
             <div className="space-y-4">
-              <h3 className="font-bold text-xs uppercase border-b border-[var(--os-border-dark)] pb-1">
+              <h3 className="font-bold text-xs uppercase border-b border-(--os-border-dark) pb-1">
                 1. Define the Data Model
               </h3>
-              <div className="terminal-output p-3 text-xs">
-                <pre>{`interface CrossElement extends BaseElement {
+              <ModernCodeBlock
+                code={`interface CrossElement extends BaseElement {
   type: "cross";
   size: number;
-}`}</pre>
-              </div>
+}`}
+              />
             </div>
 
             <div className="space-y-4">
-              <h3 className="font-bold text-xs uppercase border-b border-[var(--os-border-dark)] pb-1">
+              <h3 className="font-bold text-xs uppercase border-b border-(--os-border-dark) pb-1">
                 2. Implement the Logic
               </h3>
-              <div className="terminal-output p-3 text-xs max-h-64 overflow-y-auto">
-                <pre>{`export const crossExtension: AsciiExtension<CrossElement> = {
+              <ModernCodeBlock
+                code={`export const crossExtension: AsciiExtension<CrossElement> = {
   type: "cross",
   label: "Cross",
   icon: XIcon,
@@ -151,31 +205,31 @@ export default function Docs() {
   toAscii: (el, grid, offset) => {
     // Logic to write 'X' characters to the grid...
   }
-};`}</pre>
-              </div>
+};`}
+              />
             </div>
 
             <div className="space-y-4">
-              <h3 className="font-bold text-xs uppercase border-b border-[var(--os-border-dark)] pb-1">
+              <h3 className="font-bold text-xs uppercase border-b border-(--os-border-dark) pb-1">
                 3. Register Globally
               </h3>
               <p className="text-xs opacity-70">
                 Add the export to <code>src/extensions/registry.ts</code>:
               </p>
-              <div className="terminal-output p-3 text-xs">
-                <pre>{`export const extensions = {
+              <ModernCodeBlock
+                code={`export const extensions = {
   text: textExtension,
   box: boxExtension,
   cross: crossExtension, // Added here
-};`}</pre>
-              </div>
+};`}
+              />
             </div>
           </div>
         </div>
 
         {/* Footer */}
         <div className="text-center p-8">
-          <p className="ui-label opacity-40">
+          <p className="ui-label opacity-40 uppercase tracking-widest">
             https://github.com/cocodrilette/ascii-canva
           </p>
         </div>
