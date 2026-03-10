@@ -11,6 +11,7 @@ import {
   Unlock,
 } from "lucide-react";
 import type React from "react";
+import { hasExtension } from "../extensions/registry";
 import type { BaseElement } from "../extensions/types";
 import {
   type LayerDirection,
@@ -127,6 +128,9 @@ const LayerManager: React.FC<LayerManagerProps> = ({
                     <td className="p-1 truncate">
                       <span className="opacity-70 mr-1">#{idx}</span>
                       {el.type.toUpperCase()}
+                      {!hasExtension(el.type) && (
+                        <span className="text-red-500 ml-1 font-bold">(MISSING)</span>
+                      )}
                     </td>
                     <td className="p-1 text-right flex gap-1 justify-end">
                       <button

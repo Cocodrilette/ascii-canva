@@ -5,6 +5,7 @@ import {
   FileText,
   GripHorizontal,
   Layers,
+  Puzzle,
   Terminal,
   Trash2,
   Users,
@@ -15,14 +16,17 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BoxElement } from "../extensions/builtin/box";
 import type { LineElement } from "../extensions/builtin/line";
-import type { TextElement } from "../extensions/builtin/text";
-import type { VectorElement } from "../extensions/builtin/vector";
-import { getAllExtensions, getExtension } from "../extensions/registry";
+import type { TextElement } from "../extensions/text";
+import type { VectorElement } from "../extensions/vector";
+import { getAllExtensions, getExtension, hasExtension } from "../extensions/registry";
 import type { BaseElement } from "../extensions/types";
+import { useExtensions } from "../hooks/useExtensions";
+
 import { useRealtime } from "../hooks/useRealtime";
 import { isInside } from "../utils/geometry";
 // Removed packElements and unpackElements imports as we use JSON now
 import CollabModal from "./CollabModal";
+import { ExtensionMarketplace } from "./ExtensionMarketplace";
 import LayerManager from "./LayerManager";
 import Taskbar from "./Taskbar";
 
@@ -31,8 +35,18 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4.0;
 
 const AsciiEditor: React.FC = () => {
+  const { loading: extensionsLoading, autoInstallByTypes } = useExtensions();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [elements, setElements] = useState<BaseElement[]>([]);
+  
+  // Auto-install missing extensions when elements update (especially on remote sync)
+  useEffect(() => {
+    if (elements.length > 0 && !extensionsLoading) {
+      const types = Array.from(new Set(elements.map(el => el.type)));
+      autoInstallByTypes(types);
+    }
+  }, [elements, extensionsLoading, autoInstallByTypes]);
+
   const [_history, setHistory] = useState<BaseElement[][]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -51,6 +65,7 @@ const AsciiEditor: React.FC = () => {
   const [ascii, setAscii] = useState("");
   const [showAscii, setShowAscii] = useState(false);
   const [showCollab, setShowCollab] = useState(false);
+  const [showMarketplace, setShowMarketplace] = useState(false);
   const [showExplorer, setShowExplorer] = useState(false);
   const [newText, setNewText] = useState("");
   const [zoom, setZoom] = useState(1);
@@ -330,7 +345,7 @@ const AsciiEditor: React.FC = () => {
 
     // Culling and Rendering
     const visibleElements = elements.filter((el) => {
-      if (el.hidden) return false;
+      if (el.hidden || !hasExtension(el.type)) return false;
       const ext = getExtension(el.type);
       const b = ext.getBounds(el);
       const screenX = b.left * visualCellSize + viewOffset.x;
@@ -376,7 +391,7 @@ const AsciiEditor: React.FC = () => {
     const clickedEl = [...elements]
       .reverse()
       .find((el) => {
-        if (el.locked || el.hidden) return false;
+        if (el.locked || el.hidden || !hasExtension(el.type)) return false;
         const ext = getExtension(el.type);
         const b = ext.getBounds(el);
         return (
@@ -962,7 +977,7 @@ const AsciiEditor: React.FC = () => {
     const clickedEl = [...elements]
       .reverse()
       .find((el) => {
-        if (el.locked || el.hidden) return false;
+        if (el.locked || el.hidden || !hasExtension(el.type)) return false;
         const ext = getExtension(el.type);
         const b = ext.getBounds(el);
         return (
@@ -1160,7 +1175,10 @@ const AsciiEditor: React.FC = () => {
   );
   const generateAscii = () => {
     if (elements.length === 0) return;
-    const bounds = elements.map((el) => getExtension(el.type).getBounds(el));
+    const registeredElements = elements.filter(el => hasExtension(el.type));
+    if (registeredElements.length === 0) return;
+    
+    const bounds = registeredElements.map((el) => getExtension(el.type).getBounds(el));
     const minX = Math.min(...bounds.map((b) => b.left));
     const maxX = Math.max(...bounds.map((b) => b.right));
     const minY = Math.min(...bounds.map((b) => b.top));
@@ -1172,7 +1190,7 @@ const AsciiEditor: React.FC = () => {
       Array.from({ length: width }, () => " "),
     );
 
-    for (const el of elements) {
+    for (const el of registeredElements) {
       getExtension(el.type).toAscii(el, grid, { x: minX, y: minY });
     }
 
@@ -1187,7 +1205,7 @@ const AsciiEditor: React.FC = () => {
       setSelectedId(id);
       if (id) {
         const el = elements.find((e) => e.id === id);
-        if (el) {
+        if (el && hasExtension(el.type)) {
           const ext = getExtension(el.type);
           const b = ext.getBounds(el);
           const centerX = (b.left + b.right) / 2;
@@ -1326,6 +1344,14 @@ const AsciiEditor: React.FC = () => {
                   <ext.icon size={12} /> {ext.label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setShowMarketplace(true)}
+                className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] bg-yellow-50 border-yellow-600"
+                title="Open Extension Marketplace"
+              >
+                <Puzzle size={12} /> Marketplace
+              </button>
             </div>
           </div>
 
@@ -1476,6 +1502,10 @@ const AsciiEditor: React.FC = () => {
         status={status}
         onStartHost={startCollaboration}
       />
+
+      {showMarketplace && (
+        <ExtensionMarketplace onClose={() => setShowMarketplace(false)} />
+      )}
 
       <LayerManager
         isOpen={showExplorer}
