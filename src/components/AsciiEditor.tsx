@@ -40,8 +40,39 @@ const isInside = (child: BaseElement, parent: BaseElement) => {
 const AsciiEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [elements, setElements] = useState<BaseElement[]>([
-    getExtension("text").create(100, 100, { text: "ASCII_CANVA" }),
-    getExtension("box").create(100, 100, { width: 24, height: 8 }),
+    // Title & Welcome
+    { ...getExtension("text").create(10, 5, { text: "WELCOME TO ASCII_CANVA" }), isCenter: true },
+    getExtension("text").create(10, 7, { text: "A simple, collaborative ASCII workspace." }),
+    
+    // Quick Instructions
+    getExtension("box").create(10, 10, { width: 38, height: 10 }),
+    getExtension("text").create(12, 11, { text: "QUICK START GUIDE:" }),
+    getExtension("text").create(12, 13, { text: "• Click tools above to add objects" }),
+    getExtension("text").create(12, 14, { text: "• Drag objects to move them" }),
+    getExtension("text").create(12, 15, { text: "• Double-click text to edit" }),
+    getExtension("text").create(12, 16, { text: "• Right-click for context menu" }),
+    getExtension("text").create(12, 17, { text: "• Use 'Export' to get .txt art" }),
+
+    // Examples Area
+    getExtension("text").create(50, 10, { text: "EXTENSIBLE PRIMITIVES:" }),
+    
+    // Box Example
+    getExtension("box").create(50, 12, { width: 12, height: 5 }),
+    getExtension("text").create(51, 13, { text: "Resizable" }),
+    getExtension("text").create(51, 14, { text: "Containers" }),
+
+    // Vector Example
+    getExtension("text").create(70, 12, { text: "Smart Vectors" }),
+    getExtension("vector").create(70, 14, { x2: 85, y2: 14 }),
+    getExtension("text").create(70, 16, { text: "Connect them to boxes" }),
+    getExtension("text").create(70, 17, { text: "to create diagrams!" }),
+
+    // A little bit of "Art"
+    getExtension("text").create(10, 24, { text: "  _   _  " }),
+    getExtension("text").create(10, 25, { text: " ( ) ( ) " }),
+    getExtension("text").create(10, 26, { text: "  \\_ _/  " }),
+    getExtension("text").create(10, 27, { text: "    V    " }),
+    getExtension("text").create(14, 25, { text: "<-- Simple ASCII Art" }),
   ]);
   const [_history, setHistory] = useState<BaseElement[][]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1162,7 +1193,7 @@ const AsciiEditor: React.FC = () => {
         <div className="flex items-center justify-between px-2 py-1 bg-[var(--os-titlebar)] text-white font-mono text-[11px] uppercase tracking-wider">
           <div className="flex items-center gap-2 font-['VT323'] text-sm">
             <Terminal size={14} />
-            <span className="font-bold">ascii_canva_v1.0.exe</span>
+            <span className="font-bold">ascii_canva_v{process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0"}.exe</span>
           </div>
           <div className="flex items-center gap-4 text-[10px] font-sans uppercase font-bold">
             {status === "connected" && (
