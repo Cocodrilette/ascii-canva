@@ -29,6 +29,7 @@ import CollabModal from "./CollabModal";
 import { ExtensionMarketplace } from "./ExtensionMarketplace";
 import LayerManager from "./LayerManager";
 import Taskbar from "./Taskbar";
+import { TutorialModal } from "./TutorialModal";
 
 const CELL_SIZE = 14;
 const MIN_ZOOM = 0.5;
@@ -48,7 +49,7 @@ const AsciiEditor: React.FC = () => {
   }, [elements, extensionsLoading, autoInstallByTypes]);
 
   const [_history, setHistory] = useState<BaseElement[][]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const isRemoteUpdate = useRef(false);
 
@@ -62,11 +63,25 @@ const AsciiEditor: React.FC = () => {
   const dragOffset = useRef({ x: 0, y: 0 });
   const [capturedIds, setCapturedIds] = useState<string[]>([]);
 
+  const [isSelectingArea, setIsSelectingArea] = useState(false);
+  const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
+  const [selectionEnd, setSelectionEnd] = useState({ x: 0, y: 0 });
+  const [spacePressed, setSpacePressed] = useState(false);
+
   const [ascii, setAscii] = useState("");
   const [showAscii, setShowAscii] = useState(false);
   const [showCollab, setShowCollab] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [showExplorer, setShowExplorer] = useState(false);
+
+  useEffect(() => {
+    const hasSeenTutorial = localStorage.getItem("ascii-seen-tutorial");
+    if (!hasSeenTutorial) {
+      setShowTutorial(true);
+      localStorage.setItem("ascii-seen-tutorial", "true");
+    }
+  }, []);
   const [newText, setNewText] = useState("");
   const [zoom, setZoom] = useState(1);
   const [touchDist, setTouchDist] = useState<number | null>(null);
@@ -165,6 +180,29 @@ const AsciiEditor: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo]);
 
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code === "Space" && !isEditing) {
+        // Only prevent if not typing in textarea
+        if (document.activeElement?.tagName !== "TEXTAREA" && document.activeElement?.tagName !== "INPUT") {
+          e.preventDefault();
+          setSpacePressed(true);
+        }
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        setSpacePressed(false);
+      }
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, [isEditing]);
+
   // P2P Setup
   const centerView = useCallback(
     (els: BaseElement[]) => {
@@ -209,17 +247,17 @@ const AsciiEditor: React.FC = () => {
   );
 
   const setCenter = useCallback(() => {
-    if (!selectedId) return;
+    if (selectedIds.length !== 1) return;
     pushToHistory();
     setElements((prev) => {
       const next = prev.map((el) => ({
         ...el,
-        isCenter: el.id === selectedId,
+        isCenter: el.id === selectedIds[0],
       }));
       centerView(next);
       return next;
     });
-  }, [selectedId, pushToHistory, centerView]);
+  }, [selectedIds, pushToHistory, centerView]);
 
   // Sync elements to peers (Bi-directional)
   useEffect(() => {
@@ -362,11 +400,30 @@ const AsciiEditor: React.FC = () => {
 
     for (const el of visibleElements) {
       const ext = getExtension(el.type);
-      ext.render(ctx, el, el.id === selectedId, visualCellSize);
+      ext.render(ctx, el, selectedIds.includes(el.id), visualCellSize);
+    }
+
+    // Draw selection marquee
+    if (isSelectingArea) {
+      ctx.restore(); // Exit grid coordinate space for pixel-based marquee
+      ctx.save();
+      ctx.strokeStyle = "#000080";
+      ctx.setLineDash([2, 2]);
+      ctx.lineWidth = 1;
+      ctx.fillStyle = "rgba(0, 0, 128, 0.1)";
+      const x = Math.min(selectionStart.x, selectionEnd.x);
+      const y = Math.min(selectionStart.y, selectionEnd.y);
+      const w = Math.abs(selectionStart.x - selectionEnd.x);
+      const h = Math.abs(selectionStart.y - selectionEnd.y);
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
+      ctx.restore();
+      ctx.save();
+      ctx.translate(viewOffset.x, viewOffset.y);
     }
 
     ctx.restore();
-  }, [elements, selectedId, visualCellSize, viewOffset]);
+  }, [elements, selectedIds, visualCellSize, viewOffset, isSelectingArea, selectionStart, selectionEnd]);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -379,12 +436,37 @@ const AsciiEditor: React.FC = () => {
   }, [draw]);
 
   const handleMouseUp = useCallback(() => {
+    if (isSelectingArea) {
+      const x1 = Math.min(selectionStart.x, selectionEnd.x);
+      const y1 = Math.min(selectionStart.y, selectionEnd.y);
+      const x2 = Math.max(selectionStart.x, selectionEnd.x);
+      const y2 = Math.max(selectionStart.y, selectionEnd.y);
+
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const newlySelected = elements.filter(el => {
+          if (!hasExtension(el.type)) return false;
+          const b = getExtension(el.type).getBounds(el);
+          const screenL = b.left * visualCellSize + viewOffset.x + rect.left;
+          const screenT = b.top * visualCellSize + viewOffset.y + rect.top;
+          const screenR = b.right * visualCellSize + viewOffset.x + rect.left;
+          const screenB = b.bottom * visualCellSize + viewOffset.y + rect.top;
+
+          return screenL < x2 && screenR > x1 && screenT < y2 && screenB > y1;
+        }).map(el => el.id);
+
+        setSelectedIds(prev => Array.from(new Set([...prev, ...newlySelected])));
+      }
+    }
+
     setIsDragging(false);
     setIsResizing(false);
     setDraggedPointIndex(null);
     setIsPanning(false);
+    setIsSelectingArea(false);
     setCapturedIds([]);
-  }, []);
+  }, [isSelectingArea, selectionStart, selectionEnd, elements, visualCellSize, viewOffset]);
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
@@ -403,7 +485,7 @@ const AsciiEditor: React.FC = () => {
       });
 
     if (clickedEl?.type === "text" && !hasDragged.current) {
-      setSelectedId(clickedEl.id);
+      setSelectedIds([clickedEl.id]);
       setIsEditing(true);
     }
   };
@@ -419,21 +501,23 @@ const AsciiEditor: React.FC = () => {
       const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
 
       // Check if right-clicking a vector/line point handle first
-      const selected = elements.find((el) => el.id === selectedId);
-      if (selected?.type === "vector" || selected?.type === "line") {
-        const vec = selected as VectorElement | LineElement;
-        for (let i = 0; i < vec.points.length; i++) {
-          const p = vec.points[i];
-          const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
-          const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
-          if (Math.abs(mouseX - px) < 15 && Math.abs(mouseY - py) < 15) {
-            setContextMenu({
-              x: e.clientX,
-              y: e.clientY,
-              elementId: selected.id,
-              pointIndex: i,
-            });
-            return;
+      if (selectedIds.length === 1) {
+        const selected = elements.find((el) => el.id === selectedIds[0]);
+        if (selected?.type === "vector" || selected?.type === "line") {
+          const vec = selected as VectorElement | LineElement;
+          for (let i = 0; i < vec.points.length; i++) {
+            const p = vec.points[i];
+            const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
+            const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
+            if (Math.abs(mouseX - px) < 15 && Math.abs(mouseY - py) < 15) {
+              setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                elementId: selected.id,
+                pointIndex: i,
+              });
+              return;
+            }
           }
         }
       }
@@ -442,7 +526,7 @@ const AsciiEditor: React.FC = () => {
       const clickedEl = [...elements]
         .reverse()
         .find((el) => {
-          if (el.locked || el.hidden) return false;
+          if (el.locked || el.hidden || !hasExtension(el.type)) return false;
           const ext = getExtension(el.type);
           const b = ext.getBounds(el);
           return (
@@ -454,18 +538,20 @@ const AsciiEditor: React.FC = () => {
         });
 
       if (clickedEl) {
-        setSelectedId(clickedEl.id);
+        if (!selectedIds.includes(clickedEl.id)) {
+          setSelectedIds([clickedEl.id]);
+        }
         setContextMenu({
           x: e.clientX,
           y: e.clientY,
           elementId: clickedEl.id,
         });
       } else {
-        setSelectedId(null);
+        setSelectedIds([]);
         setContextMenu(null);
       }
     },
-    [elements, getGridCoords, selectedId, visualCellSize, viewOffset],
+    [elements, getGridCoords, selectedIds, visualCellSize, viewOffset],
   );
 
   const deleteVectorPoint = useCallback(
@@ -507,10 +593,15 @@ const AsciiEditor: React.FC = () => {
 
       const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
 
-      if (isResizing && selectedId) {
+      if (isSelectingArea) {
+        setSelectionEnd({ x: e.clientX, y: e.clientY });
+        return;
+      }
+
+      if (isResizing && selectedIds.length === 1) {
         setElements((prev) =>
           prev.map((el) => {
-            if (el.id === selectedId && el.type === "box") {
+            if (el.id === selectedIds[0] && el.type === "box") {
               const box = el as BoxElement;
               const newWidth = Math.max(2, gridX - box.x + 1);
               const newHeight = Math.max(2, gridY - box.y + 1);
@@ -537,10 +628,10 @@ const AsciiEditor: React.FC = () => {
             return el;
           }),
         );
-      } else if (draggedPointIndex !== null && selectedId) {
+      } else if (draggedPointIndex !== null && selectedIds.length === 1) {
         setElements((prev) =>
           prev.map((el) => {
-            if (el.id === selectedId && (el.type === "vector" || el.type === "line")) {
+            if (el.id === selectedIds[0] && (el.type === "vector" || el.type === "line")) {
               const vec = el as VectorElement | LineElement;
               const isStart = draggedPointIndex === 0;
               const isEnd = draggedPointIndex === vec.points.length - 1;
@@ -552,7 +643,7 @@ const AsciiEditor: React.FC = () => {
               if (isStart || isEnd) {
                 const hit = prev.find(
                   (other) =>
-                    other.id !== selectedId &&
+                    !selectedIds.includes(other.id) &&
                     other.type !== "vector" &&
                     other.type !== "line" &&
                     gridX >= getExtension(other.type).getBounds(other).left &&
@@ -597,12 +688,12 @@ const AsciiEditor: React.FC = () => {
             return el;
           }),
         );
-      } else if (isDragging && selectedId) {
+      } else if (isDragging && selectedIds.length > 0) {
         const dx = gridX - dragOffset.current.x;
         const dy = gridY - dragOffset.current.y;
         if (dx !== 0 || dy !== 0) {
           hasDragged.current = true;
-          const movedIds = [selectedId, ...capturedIds];
+          const movedIds = [...selectedIds, ...capturedIds];
           setElements((prev) =>
             prev.map((el) => {
               if (movedIds.includes(el.id)) {
@@ -665,7 +756,8 @@ const AsciiEditor: React.FC = () => {
       isDragging,
       isResizing,
       isPanning,
-      selectedId,
+      isSelectingArea,
+      selectedIds,
       getGridCoords,
       panStart,
       capturedIds,
@@ -678,6 +770,7 @@ const AsciiEditor: React.FC = () => {
     setIsResizing(false);
     setDraggedPointIndex(null);
     setIsPanning(false);
+    setIsSelectingArea(false);
     setCapturedIds([]);
   }, []);
 
@@ -704,10 +797,10 @@ const AsciiEditor: React.FC = () => {
           touch.clientY,
         );
 
-        if (isResizing && selectedId) {
+        if (isResizing && selectedIds.length === 1) {
           setElements((prev) =>
             prev.map((el) => {
-              if (el.id === selectedId && el.type === "box") {
+              if (el.id === selectedIds[0] && el.type === "box") {
                 const box = el as BoxElement;
                 const newWidth = Math.max(2, gridX - box.x + 1);
                 const newHeight = Math.max(2, gridY - box.y + 1);
@@ -734,10 +827,10 @@ const AsciiEditor: React.FC = () => {
               return el;
             }),
           );
-        } else if (draggedPointIndex !== null && selectedId) {
+        } else if (draggedPointIndex !== null && selectedIds.length === 1) {
           setElements((prev) =>
             prev.map((el) => {
-              if (el.id === selectedId && el.type === "vector") {
+              if (el.id === selectedIds[0] && el.type === "vector") {
                 const vec = el as VectorElement;
                 const isStart = draggedPointIndex === 0;
                 const isEnd = draggedPointIndex === vec.points.length - 1;
@@ -749,7 +842,7 @@ const AsciiEditor: React.FC = () => {
                 if (isStart || isEnd) {
                   const hit = prev.find(
                     (other) =>
-                      other.id !== selectedId &&
+                      !selectedIds.includes(other.id) &&
                       other.type !== "vector" &&
                       gridX >= getExtension(other.type).getBounds(other).left &&
                       gridX < getExtension(other.type).getBounds(other).right &&
@@ -793,12 +886,12 @@ const AsciiEditor: React.FC = () => {
               return el;
             }),
           );
-        } else if (isDragging && selectedId) {
+        } else if (isDragging && selectedIds.length > 0) {
           const dx = gridX - dragOffset.current.x;
           const dy = gridY - dragOffset.current.y;
           if (dx !== 0 || dy !== 0) {
             hasDragged.current = true;
-            const movedIds = [selectedId, ...capturedIds];
+            const movedIds = [...selectedIds, ...capturedIds];
             setElements((prev) =>
               prev.map((el) => {
                 if (movedIds.includes(el.id)) {
@@ -865,7 +958,7 @@ const AsciiEditor: React.FC = () => {
       isDragging,
       isResizing,
       isPanning,
-      selectedId,
+      selectedIds,
       getGridCoords,
       dragOffset,
       panStart,
@@ -918,57 +1011,61 @@ const AsciiEditor: React.FC = () => {
     const mouseY = e.clientY - rect.top;
 
     const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
-    const selected = elements.find((el) => el.id === selectedId);
+    
+    // Only allow resizing/point dragging if exactly one element is selected
+    if (selectedIds.length === 1) {
+      const selected = elements.find((el) => el.id === selectedIds[0]);
 
-    if (selected?.type === "box") {
-      const box = selected as BoxElement;
-      const handleX = (box.x + box.width) * visualCellSize + viewOffset.x;
-      const handleY = (box.y + box.height) * visualCellSize + viewOffset.y;
-      if (
-        Math.abs(mouseX - handleX) < 15 &&
-        Math.abs(mouseY - handleY) < 15
-      ) {
-        pushToHistory();
-        setIsResizing(true);
-        hasDragged.current = true;
-        return;
-      }
-    }
-
-    if (selected?.type === "vector" || selected?.type === "line") {
-      const vec = selected as VectorElement | LineElement;
-      for (let i = 0; i < vec.points.length; i++) {
-        const p = vec.points[i];
-        const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
-        const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
-
-        if (Math.abs(mouseX - px) < 15 && Math.abs(mouseY - py) < 15) {
-          if (e.detail === 2 && vec.points.length < 10) {
-            // Double click: add point after this one
-            pushToHistory();
-            const nextIdx = (i + 1) % vec.points.length;
-            const nextP = vec.points[nextIdx];
-            const newP = {
-              x: Math.round((p.x + nextP.x) / 2),
-              y: Math.round((p.y + nextP.y) / 2),
-            };
-            setElements((prev) =>
-              prev.map((el) => {
-                if (el.id === selectedId) {
-                  const v = el as VectorElement | LineElement;
-                  const newPoints = [...v.points];
-                  newPoints.splice(i + 1, 0, newP);
-                  return { ...v, points: newPoints };
-                }
-                return el;
-              }),
-            );
-            return;
-          }
+      if (selected?.type === "box") {
+        const box = selected as BoxElement;
+        const handleX = (box.x + box.width) * visualCellSize + viewOffset.x;
+        const handleY = (box.y + box.height) * visualCellSize + viewOffset.y;
+        if (
+          Math.abs(mouseX - handleX) < 15 &&
+          Math.abs(mouseY - handleY) < 15
+        ) {
           pushToHistory();
-          setDraggedPointIndex(i);
+          setIsResizing(true);
           hasDragged.current = true;
           return;
+        }
+      }
+
+      if (selected?.type === "vector" || selected?.type === "line") {
+        const vec = selected as VectorElement | LineElement;
+        for (let i = 0; i < vec.points.length; i++) {
+          const p = vec.points[i];
+          const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
+          const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
+
+          if (Math.abs(mouseX - px) < 15 && Math.abs(mouseY - py) < 15) {
+            if (e.detail === 2 && vec.points.length < 10) {
+              // Double click: add point after this one
+              pushToHistory();
+              const nextIdx = (i + 1) % vec.points.length;
+              const nextP = vec.points[nextIdx];
+              const newP = {
+                x: Math.round((p.x + nextP.x) / 2),
+                y: Math.round((p.y + nextP.y) / 2),
+              };
+              setElements((prev) =>
+                prev.map((el) => {
+                  if (el.id === selectedIds[0]) {
+                    const v = el as VectorElement | LineElement;
+                    const newPoints = [...v.points];
+                    newPoints.splice(i + 1, 0, newP);
+                    return { ...v, points: newPoints };
+                  }
+                  return el;
+                }),
+              );
+              return;
+            }
+            pushToHistory();
+            setDraggedPointIndex(i);
+            hasDragged.current = true;
+            return;
+          }
         }
       }
     }
@@ -988,21 +1085,52 @@ const AsciiEditor: React.FC = () => {
         );
       });
 
+    const isCtrl = e.ctrlKey || e.metaKey;
+
     if (clickedEl) {
       pushToHistory();
-      setSelectedId(clickedEl.id);
+      
+      let nextIds: string[];
+      if (isCtrl) {
+        if (selectedIds.includes(clickedEl.id)) {
+          nextIds = selectedIds.filter(id => id !== clickedEl.id);
+        } else {
+          nextIds = [...selectedIds, clickedEl.id];
+        }
+      } else {
+        if (selectedIds.includes(clickedEl.id)) {
+          nextIds = selectedIds;
+        } else {
+          nextIds = [clickedEl.id];
+        }
+      }
+      
+      setSelectedIds(nextIds);
       setIsDragging(true);
       dragOffset.current = { x: gridX, y: gridY };
-      if (clickedEl.type === "box") {
-        const children = elements.filter((el) => isInside(el, clickedEl));
-        setCapturedIds(children.map((c) => c.id));
-      } else {
-        setCapturedIds([]);
+      
+      // Captured IDs logic (for children inside boxes)
+      const allCaptured: string[] = [];
+      for (const id of nextIds) {
+        const el = elements.find(e => e.id === id);
+        if (el?.type === "box") {
+          const children = elements.filter(child => isInside(child, el) && !nextIds.includes(child.id));
+          allCaptured.push(...children.map(c => c.id));
+        }
       }
+      setCapturedIds(allCaptured);
     } else {
-      setSelectedId(null);
-      setIsPanning(true);
-      setPanStart({ x: mouseX - viewOffset.x, y: mouseY - viewOffset.y });
+      if (spacePressed || e.button === 1) {
+        setIsPanning(true);
+        setPanStart({ x: mouseX - viewOffset.x, y: mouseY - viewOffset.y });
+      } else {
+        if (!isCtrl) {
+          setSelectedIds([]);
+        }
+        setIsSelectingArea(true);
+        setSelectionStart({ x: e.clientX, y: e.clientY });
+        setSelectionEnd({ x: e.clientX, y: e.clientY });
+      }
     }
   };
 
@@ -1028,44 +1156,46 @@ const AsciiEditor: React.FC = () => {
         touch.clientX,
         touch.clientY,
       );
-      const selected = elements.find((el) => el.id === selectedId);
-      if (selected?.type === "box") {
-        const box = selected as BoxElement;
-        const handleX = (box.x + box.width) * visualCellSize + viewOffset.x;
-        const handleY = (box.y + box.height) * visualCellSize + viewOffset.y;
-        if (
-          Math.abs(mouseX - handleX) < 30 &&
-          Math.abs(mouseY - handleY) < 30
-        ) {
-          pushToHistory();
-          setIsResizing(true);
-          hasDragged.current = true;
-          return;
-        }
-      }
-
-      if (selected?.type === "vector" || selected?.type === "line") {
-        const vec = selected as VectorElement | LineElement;
-        for (let i = 0; i < vec.points.length; i++) {
-          const p = vec.points[i];
-          const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
-          const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
-
+      if (selectedIds.length === 1) {
+        const selected = elements.find((el) => el.id === selectedIds[0]);
+        if (selected?.type === "box") {
+          const box = selected as BoxElement;
+          const handleX = (box.x + box.width) * visualCellSize + viewOffset.x;
+          const handleY = (box.y + box.height) * visualCellSize + viewOffset.y;
           if (
-            Math.abs(mouseX - px) < 30 &&
-            Math.abs(mouseY - py) < 30
+            Math.abs(mouseX - handleX) < 30 &&
+            Math.abs(mouseY - handleY) < 30
           ) {
             pushToHistory();
-            setDraggedPointIndex(i);
+            setIsResizing(true);
             hasDragged.current = true;
             return;
+          }
+        }
+
+        if (selected?.type === "vector" || selected?.type === "line") {
+          const vec = selected as VectorElement | LineElement;
+          for (let i = 0; i < vec.points.length; i++) {
+            const p = vec.points[i];
+            const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
+            const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
+
+            if (
+              Math.abs(mouseX - px) < 30 &&
+              Math.abs(mouseY - py) < 30
+            ) {
+              pushToHistory();
+              setDraggedPointIndex(i);
+              hasDragged.current = true;
+              return;
+            }
           }
         }
       }
       const clickedEl = [...elements]
         .reverse()
         .find((el) => {
-          if (el.locked || el.hidden) return false;
+          if (el.locked || el.hidden || !hasExtension(el.type)) return false;
           const ext = getExtension(el.type);
           const b = ext.getBounds(el);
           return (
@@ -1077,7 +1207,7 @@ const AsciiEditor: React.FC = () => {
         });
       if (clickedEl) {
         pushToHistory();
-        setSelectedId(clickedEl.id);
+        setSelectedIds([clickedEl.id]);
         setIsDragging(true);
         dragOffset.current = { x: gridX, y: gridY };
         if (clickedEl.type === "box") {
@@ -1087,7 +1217,7 @@ const AsciiEditor: React.FC = () => {
           setCapturedIds([]);
         }
       } else {
-        setSelectedId(null);
+        setSelectedIds([]);
         setIsPanning(true);
         setPanStart({
           x: mouseX - viewOffset.x,
@@ -1111,7 +1241,7 @@ const AsciiEditor: React.FC = () => {
     );
     setElements([...elements, newEl]);
     setNewText("");
-    setSelectedId(newEl.id);
+    setSelectedIds([newEl.id]);
   };
 
   const saveProject = () => {
@@ -1154,7 +1284,7 @@ const AsciiEditor: React.FC = () => {
   const updateSelectedText = (text: string) => {
     setElements((prev) =>
       prev.map((el) =>
-        el.id === selectedId && el.type === "text"
+        selectedIds.includes(el.id) && el.type === "text"
           ? { ...(el as TextElement), text }
           : el,
       ),
@@ -1163,15 +1293,13 @@ const AsciiEditor: React.FC = () => {
 
   const deleteSelected = useCallback(
     (id?: string) => {
-      const targetId = id || selectedId;
-      if (!targetId) return;
+      const targets = id ? [id] : selectedIds;
+      if (targets.length === 0) return;
       pushToHistory();
-      setElements((prev) => prev.filter((el) => el.id !== targetId));
-      if (targetId === selectedId) {
-        setSelectedId(null);
-      }
+      setElements((prev) => prev.filter((el) => !targets.includes(el.id)));
+      setSelectedIds(prev => prev.filter(id => !targets.includes(id)));
     },
-    [selectedId, pushToHistory],
+    [selectedIds, pushToHistory],
   );
   const generateAscii = () => {
     if (elements.length === 0) return;
@@ -1198,12 +1326,12 @@ const AsciiEditor: React.FC = () => {
     setShowAscii(true);
   };
 
-  const selectedElement = elements.find((el) => el.id === selectedId);
+  const selectedElement = selectedIds.length === 1 ? elements.find((el) => el.id === selectedIds[0]) : null;
 
   const selectAndCenterElement = useCallback(
     (id: string | null) => {
-      setSelectedId(id);
       if (id) {
+        setSelectedIds([id]);
         const el = elements.find((e) => e.id === id);
         if (el && hasExtension(el.type)) {
           const ext = getExtension(el.type);
@@ -1215,6 +1343,8 @@ const AsciiEditor: React.FC = () => {
             y: window.innerHeight / 2 - centerY * visualCellSize,
           });
         }
+      } else {
+        setSelectedIds([]);
       }
     },
     [elements, visualCellSize],
@@ -1228,7 +1358,9 @@ const AsciiEditor: React.FC = () => {
         onDoubleClick={handleDoubleClick}
         onTouchStart={handleTouchStart}
         onContextMenu={handleContextMenu}
-        className="fixed inset-x-0 top-16 bottom-8 w-full block cursor-default bg-white"
+        className={`fixed inset-x-0 top-16 bottom-8 w-full block bg-white ${
+          isPanning ? "cursor-grabbing" : spacePressed ? "cursor-grab" : "cursor-default"
+        }`}
       />
 
       {isEditing && selectedElement?.type === "text" && (
@@ -1370,6 +1502,13 @@ const AsciiEditor: React.FC = () => {
             >
               <Users size={12} /> Collaborate
             </button>
+            <button
+              type="button"
+              onClick={() => setShowTutorial(true)}
+              className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px]"
+            >
+              <Book size={12} /> Tutorial
+            </button>
             <Link
               href="/docs"
               className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] no-underline"
@@ -1380,28 +1519,30 @@ const AsciiEditor: React.FC = () => {
         </div>
 
         {/* Contextual Property Bar */}
-        {selectedId && (
+        {selectedIds.length > 0 && (
           <div className="flex items-center px-4 py-1.5 bg-white/40 border-t border-gray-300 gap-6 text-[9px] uppercase font-bold text-gray-700 animate-in slide-in-from-top duration-200">
             <div className="flex items-center gap-2">
-              <span className="opacity-40">Object:</span>
+              <span className="opacity-40">Selection:</span>
               <span className="bg-white px-1 border border-gray-300">
-                {selectedElement?.type}
+                {selectedIds.length} object(s)
               </span>
             </div>
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={setCenter}
-                className={`flex items-center gap-1 hover:text-[var(--os-titlebar)] ${elements.find((e) => e.id === selectedId)?.isCenter ? "text-blue-600" : ""}`}
-              >
-                <GripHorizontal size={12} /> Set View Center
-              </button>
+              {selectedIds.length === 1 && (
+                <button
+                  type="button"
+                  onClick={setCenter}
+                  className={`flex items-center gap-1 hover:text-[var(--os-titlebar)] ${elements.find((e) => e.id === selectedIds[0])?.isCenter ? "text-blue-600" : ""}`}
+                >
+                  <GripHorizontal size={12} /> Set View Center
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => deleteSelected()}
                 className="flex items-center gap-1 hover:text-red-600"
               >
-                <Trash2 size={12} /> Delete Element
+                <Trash2 size={12} /> Delete Selection
               </button>
             </div>
           </div>
@@ -1507,13 +1648,17 @@ const AsciiEditor: React.FC = () => {
         <ExtensionMarketplace onClose={() => setShowMarketplace(false)} />
       )}
 
+      {showTutorial && (
+        <TutorialModal onClose={() => setShowTutorial(false)} />
+      )}
+
       <LayerManager
         isOpen={showExplorer}
         onClose={() => setShowExplorer(false)}
         elements={elements}
         setElements={setElements}
-        selectedId={selectedId}
-        setSelectedId={selectAndCenterElement}
+        selectedIds={selectedIds}
+        setSelectedIds={setSelectedIds}
         onDeleteElement={deleteSelected}
       />
 

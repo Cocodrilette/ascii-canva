@@ -25,8 +25,8 @@ interface LayerManagerProps {
   onClose: () => void;
   elements: BaseElement[];
   setElements: React.Dispatch<React.SetStateAction<BaseElement[]>>;
-  selectedId: string | null;
-  setSelectedId: (id: string | null) => void;
+  selectedIds: string[];
+  setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
   onDeleteElement: (id: string) => void;
 }
 
@@ -35,8 +35,8 @@ const LayerManager: React.FC<LayerManagerProps> = ({
   onClose,
   elements,
   setElements,
-  selectedId,
-  setSelectedId,
+  selectedIds,
+  setSelectedIds,
   onDeleteElement,
 }) => {
   if (!isOpen) return null;
@@ -51,6 +51,17 @@ const LayerManager: React.FC<LayerManagerProps> = ({
 
   const handleMoveLayer = (id: string, direction: LayerDirection) => {
     setElements((prev) => reorderElements(prev, id, direction));
+  };
+
+  const handleRowClick = (e: React.MouseEvent, id: string) => {
+    const isCtrl = e.ctrlKey || e.metaKey;
+    if (isCtrl) {
+      setSelectedIds(prev => 
+        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+      );
+    } else {
+      setSelectedIds([id]);
+    }
   };
 
   return (
@@ -82,14 +93,14 @@ const LayerManager: React.FC<LayerManagerProps> = ({
             <tbody>
               {[...elements].reverse().map((el, revIdx) => {
                 const idx = elements.length - 1 - revIdx;
-                const isSelected = el.id === selectedId;
+                const isSelected = selectedIds.includes(el.id);
                 return (
                   <tr
                     key={el.id}
                     className={`border-b border-gray-50 hover:bg-blue-50 cursor-default ${
                       isSelected ? "bg-blue-100 font-bold" : ""
                     }`}
-                    onClick={() => setSelectedId(el.id)}
+                    onClick={(e) => handleRowClick(e, el.id)}
                   >
                     <td className="p-1 text-center">
                       <button
@@ -183,11 +194,11 @@ const LayerManager: React.FC<LayerManagerProps> = ({
           </table>
         </div>
 
-        {selectedId && (
+        {selectedIds.length === 1 && (
           <div className="flex gap-1 justify-between p-1 bg-gray-100 border border-[var(--os-border-dark)]">
             <button
               type="button"
-              onClick={() => handleMoveLayer(selectedId, "back")}
+              onClick={() => handleMoveLayer(selectedIds[0], "back")}
               className="retro-button px-2 py-1 text-[9px] flex items-center gap-1"
               title="Send to Back"
             >
@@ -195,7 +206,7 @@ const LayerManager: React.FC<LayerManagerProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => handleMoveLayer(selectedId, "front")}
+              onClick={() => handleMoveLayer(selectedIds[0], "front")}
               className="retro-button px-2 py-1 text-[9px] flex items-center gap-1"
               title="Bring to Front"
             >
