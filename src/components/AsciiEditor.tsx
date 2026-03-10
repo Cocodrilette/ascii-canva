@@ -108,8 +108,11 @@ const AsciiEditor: React.FC = () => {
 
   const getGridCoords = useCallback(
     (clientX: number, clientY: number) => {
-      const x = Math.floor((clientX - viewOffset.x) / visualCellSize);
-      const y = Math.floor((clientY - viewOffset.y) / visualCellSize);
+      const canvas = canvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor((clientX - rect.left - viewOffset.x) / visualCellSize);
+      const y = Math.floor((clientY - rect.top - viewOffset.y) / visualCellSize);
       return { x, y };
     },
     [viewOffset, visualCellSize],
@@ -283,12 +286,13 @@ const AsciiEditor: React.FC = () => {
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
 
+    const rect = canvas.getBoundingClientRect();
     if (
-      canvas.width !== window.innerWidth ||
-      canvas.height !== window.innerHeight
+      canvas.width !== rect.width ||
+      canvas.height !== rect.height
     ) {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      canvas.width = rect.width;
+      canvas.height = rect.height;
     }
 
     ctx.fillStyle = "#FFFFFF";
@@ -387,6 +391,12 @@ const AsciiEditor: React.FC = () => {
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
       const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
 
       // Check if right-clicking a vector point handle first
@@ -397,7 +407,7 @@ const AsciiEditor: React.FC = () => {
           const p = vec.points[i];
           const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
           const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
-          if (Math.abs(e.clientX - px) < 15 && Math.abs(e.clientY - py) < 15) {
+          if (Math.abs(mouseX - px) < 15 && Math.abs(mouseY - py) < 15) {
             setContextMenu({
               x: e.clientX,
               y: e.clientY,
@@ -473,6 +483,12 @@ const AsciiEditor: React.FC = () => {
   );
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
       const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
 
       if (isResizing && selectedId) {
@@ -624,7 +640,7 @@ const AsciiEditor: React.FC = () => {
           setDragOffset({ x: gridX, y: gridY });
         }
       } else if (isPanning) {
-        setViewOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+        setViewOffset({ x: mouseX - panStart.x, y: mouseY - panStart.y });
       }
     },
     [
@@ -659,7 +675,13 @@ const AsciiEditor: React.FC = () => {
         setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev * delta)));
         setTouchDist(dist);
       } else if (e.touches.length === 1) {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
         const touch = e.touches[0];
+        const mouseX = touch.clientX - rect.left;
+        const mouseY = touch.clientY - rect.top;
+
         const { x: gridX, y: gridY } = getGridCoords(
           touch.clientX,
           touch.clientY,
@@ -815,8 +837,8 @@ const AsciiEditor: React.FC = () => {
           }
         } else if (isPanning) {
           setViewOffset({
-            x: touch.clientX - panStart.x,
-            y: touch.clientY - panStart.y,
+            x: mouseX - panStart.x,
+            y: mouseY - panStart.y,
           });
         }
       }
@@ -869,6 +891,12 @@ const AsciiEditor: React.FC = () => {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     closeContextMenu();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
     const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
     const selected = elements.find((el) => el.id === selectedId);
 
@@ -877,8 +905,8 @@ const AsciiEditor: React.FC = () => {
       const handleX = (box.x + box.width) * visualCellSize + viewOffset.x;
       const handleY = (box.y + box.height) * visualCellSize + viewOffset.y;
       if (
-        Math.abs(e.clientX - handleX) < 15 &&
-        Math.abs(e.clientY - handleY) < 15
+        Math.abs(mouseX - handleX) < 15 &&
+        Math.abs(mouseY - handleY) < 15
       ) {
         pushToHistory();
         setIsResizing(true);
@@ -893,7 +921,7 @@ const AsciiEditor: React.FC = () => {
         const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
         const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
 
-        if (Math.abs(e.clientX - px) < 15 && Math.abs(e.clientY - py) < 15) {
+        if (Math.abs(mouseX - px) < 15 && Math.abs(mouseY - py) < 15) {
           if (e.detail === 2 && vec.points.length < 10) {
             // Double click: add point after this one
             pushToHistory();
@@ -955,7 +983,7 @@ const AsciiEditor: React.FC = () => {
     } else {
       setSelectedId(null);
       setIsPanning(true);
-      setPanStart({ x: e.clientX - viewOffset.x, y: e.clientY - viewOffset.y });
+      setPanStart({ x: mouseX - viewOffset.x, y: mouseY - viewOffset.y });
     }
   };
 
@@ -968,7 +996,13 @@ const AsciiEditor: React.FC = () => {
       setTouchDist(dist);
     } else if (e.touches.length === 1) {
       closeContextMenu();
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
       const touch = e.touches[0];
+      const mouseX = touch.clientX - rect.left;
+      const mouseY = touch.clientY - rect.top;
+
       const { x: gridX, y: gridY } = getGridCoords(
         touch.clientX,
         touch.clientY,
@@ -979,8 +1013,8 @@ const AsciiEditor: React.FC = () => {
         const handleX = (box.x + box.width) * visualCellSize + viewOffset.x;
         const handleY = (box.y + box.height) * visualCellSize + viewOffset.y;
         if (
-          Math.abs(touch.clientX - handleX) < 30 &&
-          Math.abs(touch.clientY - handleY) < 30
+          Math.abs(mouseX - handleX) < 30 &&
+          Math.abs(mouseY - handleY) < 30
         ) {
           pushToHistory();
           setIsResizing(true);
@@ -996,8 +1030,8 @@ const AsciiEditor: React.FC = () => {
           const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
 
           if (
-            Math.abs(touch.clientX - px) < 30 &&
-            Math.abs(touch.clientY - py) < 30
+            Math.abs(mouseX - px) < 30 &&
+            Math.abs(mouseY - py) < 30
           ) {
             pushToHistory();
             setDraggedPointIndex(i);
@@ -1036,8 +1070,8 @@ const AsciiEditor: React.FC = () => {
         setSelectedId(null);
         setIsPanning(true);
         setPanStart({
-          x: touch.clientX - viewOffset.x,
-          y: touch.clientY - viewOffset.y,
+          x: mouseX - viewOffset.x,
+          y: mouseY - viewOffset.y,
         });
       }
     }
@@ -1151,15 +1185,15 @@ const AsciiEditor: React.FC = () => {
         onDoubleClick={handleDoubleClick}
         onTouchStart={handleTouchStart}
         onContextMenu={handleContextMenu}
-        className="w-full h-full block cursor-default pt-16"
+        className="fixed inset-x-0 top-16 bottom-0 w-full block cursor-default bg-white"
       />
 
       {isEditing && selectedElement?.type === "text" && (
         <textarea
           className="fixed z-200 bg-white border-2 border-(--os-border-dark) font-mono resize-none outline-none overflow-hidden shadow-[2px_2px_0_rgba(0,0,0,0.5)]"
           style={{
-            left: selectedElement.x * visualCellSize + viewOffset.x,
-            top: selectedElement.y * visualCellSize + viewOffset.y,
+            left: selectedElement.x * visualCellSize + viewOffset.x + (canvasRef.current?.getBoundingClientRect().left || 0),
+            top: selectedElement.y * visualCellSize + viewOffset.y + (canvasRef.current?.getBoundingClientRect().top || 0),
             width:
               Math.max(
                 ...(selectedElement as TextElement).text
