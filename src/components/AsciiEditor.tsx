@@ -196,13 +196,15 @@ const AsciiEditor: React.FC = () => {
   const setCenter = useCallback(() => {
     if (!selectedId) return;
     pushToHistory();
-    setElements((prev) =>
-      prev.map((el) => ({
+    setElements((prev) => {
+      const next = prev.map((el) => ({
         ...el,
         isCenter: el.id === selectedId,
-      })),
-    );
-  }, [selectedId, pushToHistory]);
+      }));
+      centerView(next);
+      return next;
+    });
+  }, [selectedId, pushToHistory, centerView]);
 
   // Sync elements to peers (Bi-directional)
   useEffect(() => {
@@ -254,13 +256,10 @@ const AsciiEditor: React.FC = () => {
   }, [status, setChannelId, elements.length > 0]);
 
   useEffect(() => {
-    if (elements.length > 0 && !isDragging && !isResizing && !isPanning) {
-      const centerEl = elements.find((el) => el.isCenter);
-      if (centerEl) {
-        centerView(elements);
-      }
+    if (isLoaded && elements.length > 0) {
+      centerView(elements);
     }
-  }, [elements, centerView, isDragging, isResizing, isPanning]); // Run when elements or centerView change
+  }, [isLoaded, centerView]); // Center only once when initially loaded
 
   // Persistence
   useEffect(() => {
