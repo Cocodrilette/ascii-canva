@@ -31,41 +31,7 @@ const MAX_ZOOM = 4.0;
 
 const AsciiEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [elements, setElements] = useState<BaseElement[]>([
-    // Title & Welcome
-    { ...getExtension("text").create(10, 5, { text: "WELCOME TO ASCII_CANVA" }), isCenter: true },
-    getExtension("text").create(10, 7, { text: "A simple, collaborative ASCII workspace." }),
-    
-    // Quick Instructions
-    getExtension("box").create(10, 10, { width: 38, height: 10 }),
-    getExtension("text").create(12, 11, { text: "QUICK START GUIDE:" }),
-    getExtension("text").create(12, 13, { text: "• Click tools above to add objects" }),
-    getExtension("text").create(12, 14, { text: "• Drag objects to move them" }),
-    getExtension("text").create(12, 15, { text: "• Double-click text to edit" }),
-    getExtension("text").create(12, 16, { text: "• Right-click for context menu" }),
-    getExtension("text").create(12, 17, { text: "• Use 'Export' to get .txt art" }),
-
-    // Examples Area
-    getExtension("text").create(50, 10, { text: "EXTENSIBLE PRIMITIVES:" }),
-    
-    // Box Example
-    getExtension("box").create(50, 12, { width: 12, height: 5 }),
-    getExtension("text").create(51, 13, { text: "Resizable" }),
-    getExtension("text").create(51, 14, { text: "Containers" }),
-
-    // Vector Example
-    getExtension("text").create(70, 12, { text: "Smart Vectors" }),
-    getExtension("vector").create(70, 14, { x2: 85, y2: 14 }),
-    getExtension("text").create(70, 16, { text: "Connect them to boxes" }),
-    getExtension("text").create(70, 17, { text: "to create diagrams!" }),
-
-    // A little bit of "Art"
-    getExtension("text").create(10, 24, { text: "  _   _  " }),
-    getExtension("text").create(10, 25, { text: " ( ) ( ) " }),
-    getExtension("text").create(10, 26, { text: "  \\_ _/  " }),
-    getExtension("text").create(10, 27, { text: "    V    " }),
-    getExtension("text").create(14, 25, { text: "<-- Simple ASCII Art" }),
-  ]);
+  const [elements, setElements] = useState<BaseElement[]>([]);
   const [_history, setHistory] = useState<BaseElement[][]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -98,6 +64,44 @@ const AsciiEditor: React.FC = () => {
     elementId: string;
     pointIndex?: number;
   } | null>(null);
+
+  const getWelcomeElements = useCallback(() => {
+    return [
+      // Title & Welcome
+      { ...getExtension("text").create(10, 5, { text: "WELCOME TO ASCII_CANVA" }), isCenter: true },
+      getExtension("text").create(10, 7, { text: "A simple, collaborative ASCII workspace." }),
+      
+      // Quick Instructions
+      getExtension("box").create(10, 10, { width: 38, height: 10 }),
+      getExtension("text").create(12, 11, { text: "QUICK START GUIDE:" }),
+      getExtension("text").create(12, 13, { text: "• Click tools above to add objects" }),
+      getExtension("text").create(12, 14, { text: "• Drag objects to move them" }),
+      getExtension("text").create(12, 15, { text: "• Double-click text to edit" }),
+      getExtension("text").create(12, 16, { text: "• Right-click for context menu" }),
+      getExtension("text").create(12, 17, { text: "• Use 'Export' to get .txt art" }),
+
+      // Examples Area
+      getExtension("text").create(50, 10, { text: "EXTENSIBLE PRIMITIVES:" }),
+      
+      // Box Example
+      getExtension("box").create(50, 12, { width: 12, height: 5 }),
+      getExtension("text").create(51, 13, { text: "Resizable" }),
+      getExtension("text").create(51, 14, { text: "Containers" }),
+
+      // Vector Example
+      getExtension("text").create(70, 12, { text: "Smart Vectors" }),
+      getExtension("vector").create(70, 14, { x2: 85, y2: 14 }),
+      getExtension("text").create(70, 16, { text: "Connect them to boxes" }),
+      getExtension("text").create(70, 17, { text: "to create diagrams!" }),
+
+      // A little bit of "Art"
+      getExtension("text").create(10, 24, { text: "  _   _  " }),
+      getExtension("text").create(10, 25, { text: " ( ) ( ) " }),
+      getExtension("text").create(10, 26, { text: "  \\_ _/  " }),
+      getExtension("text").create(10, 27, { text: "    V    " }),
+      getExtension("text").create(14, 25, { text: "<-- Simple ASCII Art" }),
+    ];
+  }, []);
 
   const visualCellSize = CELL_SIZE * zoom;
 
@@ -230,9 +234,7 @@ const AsciiEditor: React.FC = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const joinId = urlParams.get("join");
     if (joinId && status === "idle") {
-      const hasContent =
-        elements.length > 2 ||
-        (elements.length > 0 && elements[0].type !== "text"); // Simple heuristic
+      const hasContent = elements.length > 0;
       if (hasContent) {
         if (
           window.confirm(
@@ -248,7 +250,7 @@ const AsciiEditor: React.FC = () => {
         setChannelId(joinId);
       }
     }
-  }, [status, setChannelId, elements]);
+  }, [status, setChannelId, elements.length > 0]);
 
   useEffect(() => {
     if (elements.length > 0) {
@@ -261,16 +263,24 @@ const AsciiEditor: React.FC = () => {
 
   // Persistence
   useEffect(() => {
-    const saved = localStorage.getItem("ascii-canvas-state");
-    if (saved) {
-      try {
-        setElements(JSON.parse(saved));
-      } catch (_e) {
-        console.error("Failed to restore state");
+    const urlParams = new URLSearchParams(window.location.search);
+    const isJoining = urlParams.has("join");
+
+    if (!isJoining) {
+      const saved = localStorage.getItem("ascii-canvas-state");
+      if (saved) {
+        try {
+          setElements(JSON.parse(saved));
+        } catch (_e) {
+          console.error("Failed to restore state");
+          setElements(getWelcomeElements());
+        }
+      } else {
+        setElements(getWelcomeElements());
       }
     }
     setIsLoaded(true);
-  }, []);
+  }, [getWelcomeElements]);
 
   useEffect(() => {
     if (isLoaded) {
