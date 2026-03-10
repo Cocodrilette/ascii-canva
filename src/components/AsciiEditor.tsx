@@ -45,7 +45,7 @@ const AsciiEditor: React.FC = () => {
   const [draggedPointIndex, setDraggedPointIndex] = useState<number | null>(
     null,
   );
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const dragOffset = useRef({ x: 0, y: 0 });
   const [capturedIds, setCapturedIds] = useState<string[]>([]);
 
   const [ascii, setAscii] = useState("");
@@ -584,8 +584,8 @@ const AsciiEditor: React.FC = () => {
           }),
         );
       } else if (isDragging && selectedId) {
-        const dx = gridX - dragOffset.x;
-        const dy = gridY - dragOffset.y;
+        const dx = gridX - dragOffset.current.x;
+        const dy = gridY - dragOffset.current.y;
         if (dx !== 0 || dy !== 0) {
           hasDragged.current = true;
           const movedIds = [selectedId, ...capturedIds];
@@ -641,7 +641,7 @@ const AsciiEditor: React.FC = () => {
               return el;
             }),
           );
-          setDragOffset({ x: gridX, y: gridY });
+          dragOffset.current = { x: gridX, y: gridY };
         }
       } else if (isPanning) {
         setViewOffset({ x: mouseX - panStart.x, y: mouseY - panStart.y });
@@ -653,7 +653,6 @@ const AsciiEditor: React.FC = () => {
       isPanning,
       selectedId,
       getGridCoords,
-      dragOffset,
       panStart,
       capturedIds,
       draggedPointIndex,
@@ -978,7 +977,7 @@ const AsciiEditor: React.FC = () => {
       pushToHistory();
       setSelectedId(clickedEl.id);
       setIsDragging(true);
-      setDragOffset({ x: gridX, y: gridY });
+      dragOffset.current = { x: gridX, y: gridY };
       if (clickedEl.type === "box") {
         const children = elements.filter((el) => isInside(el, clickedEl));
         setCapturedIds(children.map((c) => c.id));
@@ -1065,7 +1064,7 @@ const AsciiEditor: React.FC = () => {
         pushToHistory();
         setSelectedId(clickedEl.id);
         setIsDragging(true);
-        setDragOffset({ x: gridX, y: gridY });
+        dragOffset.current = { x: gridX, y: gridY };
         if (clickedEl.type === "box") {
           const children = elements.filter((el) => isInside(el, clickedEl));
           setCapturedIds(children.map((c) => c.id));
