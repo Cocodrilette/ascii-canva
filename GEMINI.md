@@ -1,4 +1,4 @@
-# 🤖 AI Agent
+# 🎨 ascii_canva
 
 > Built on the **Frontend Genesis** stack — glassmorphism UI, type-safe data flows, and secure proxy architecture.
 

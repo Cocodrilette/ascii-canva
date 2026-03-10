@@ -65,18 +65,24 @@ export default function Docs() {
   return (
     <div className="min-h-screen bg-(--os-bg) p-8 overflow-auto">
       <Head>
-        <title>Genesis ASCII - Documentation</title>
+        <title>ascii_canva - Documentation</title>
       </Head>
 
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Navigation */}
         <div className="flex justify-between items-center">
           <Link
-            href="/"
+            href="/space"
             className="retro-button flex items-center gap-2 no-underline"
           >
             <ChevronLeft size={14} />
-            <span>Back to Editor</span>
+            <span>Back to Workspace</span>
+          </Link>
+          <Link
+            href="/"
+            className="retro-button flex items-center gap-2 no-underline"
+          >
+            <span>Home</span>
           </Link>
           <div className="ui-label uppercase tracking-widest opacity-50">
             System Documentation v1.0
@@ -102,7 +108,7 @@ export default function Docs() {
               Extension System Guide
             </h1>
             <p className="opacity-80 leading-relaxed">
-              Genesis ASCII is built on a modular extension architecture. This
+              ascii_canva is built on a modular extension architecture. This
               document explains how to develop, test, and integrate new drawing
               primitives into the platform.
             </p>

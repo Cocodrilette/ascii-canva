@@ -4,6 +4,7 @@ import {
   Download,
   FileText,
   GripHorizontal,
+  Terminal,
   Trash2,
   Users,
   Wifi,
@@ -39,8 +40,8 @@ const isInside = (child: BaseElement, parent: BaseElement) => {
 const AsciiEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [elements, setElements] = useState<BaseElement[]>([
-    getExtension("text").create(100, 100, { text: "GENESIS ASCII" }),
-    getExtension("box").create(100, 100, { width: 20, height: 6 }),
+    getExtension("text").create(100, 100, { text: "ASCII_CANVA" }),
+    getExtension("box").create(100, 100, { width: 24, height: 8 }),
   ]);
   const [_history, setHistory] = useState<BaseElement[][]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1112,19 +1113,19 @@ const AsciiEditor: React.FC = () => {
   const selectedElement = elements.find((el) => el.id === selectedId);
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-[var(--os-bg)] select-none">
+    <div className="fixed inset-0 overflow-hidden bg-(--os-bg) select-none">
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
         onTouchStart={handleTouchStart}
         onContextMenu={handleContextMenu}
-        className="w-full h-full block cursor-default"
+        className="w-full h-full block cursor-default pt-16"
       />
 
       {isEditing && selectedElement?.type === "text" && (
         <textarea
-          className="fixed z-[200] bg-white border-2 border-[var(--os-border-dark)] font-mono resize-none outline-none overflow-hidden shadow-[2px_2px_0_rgba(0,0,0,0.5)]"
+          className="fixed z-200 bg-white border-2 border-(--os-border-dark) font-mono resize-none outline-none overflow-hidden shadow-[2px_2px_0_rgba(0,0,0,0.5)]"
           style={{
             left: selectedElement.x * visualCellSize + viewOffset.x,
             top: selectedElement.y * visualCellSize + viewOffset.y,
@@ -1156,104 +1157,132 @@ const AsciiEditor: React.FC = () => {
         />
       )}
 
-      <div className="absolute top-4 left-4 window-raised flex flex-col z-50 min-w-[260px] shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
-        <div className="title-bar cursor-default">
-          <span className="flex items-center gap-2 font-bold">
-            Genesis_ASCII.exe
-          </span>
-          <div className="flex gap-1">
+      {/* Main UI Header */}
+      <div className="fixed top-0 left-0 right-0 bg-(--os-bg) border-b-2 border-(--os-border-dark) z-50 flex flex-col shadow-sm">
+        <div className="flex items-center justify-between px-2 py-1 bg-[var(--os-titlebar)] text-white font-mono text-[11px] uppercase tracking-wider">
+          <div className="flex items-center gap-2 font-['VT323'] text-sm">
+            <Terminal size={14} />
+            <span className="font-bold">ascii_canva_v1.0.exe</span>
+          </div>
+          <div className="flex items-center gap-4 text-[10px] font-sans uppercase font-bold">
+            {status === "connected" && (
+              <span className="text-green-400 flex items-center gap-1">
+                <Wifi size={10} className="animate-pulse" /> SYNCED: {channelId}
+              </span>
+            )}
+            <div className="flex gap-1">
+              <button
+                type="button"
+                className="w-4 h-4 bg-(--os-bg) border-t border-l border-[var(--os-border-light)] border-r border-b border-(--os-border-dark) text-black flex items-center justify-center text-[10px]"
+              >
+                _
+              </button>
+              <button
+                type="button"
+                className="w-4 h-4 bg-(--os-bg) border-t border-l border-[var(--os-border-light)] border-r border-b border-(--os-border-dark) text-black flex items-center justify-center text-[10px]"
+              >
+                □
+              </button>
+              <button
+                type="button"
+                onClick={() => (window.location.href = "/")}
+                className="w-4 h-4 bg-(--os-bg) border-t border-l border-[var(--os-border-light)] border-r border-b border-(--os-border-dark) text-black hover:bg-red-500 hover:text-white flex items-center justify-center text-[10px]"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between px-2 py-1.5 gap-4 bg-(--os-bg)">
+          <div className="flex items-center gap-1">
+            {/* File Group */}
+            <div className="flex gap-1 border-r border-gray-400 pr-2 mr-2">
+              <button
+                type="button"
+                onClick={saveProject}
+                className="retro-button px-2 py-1 text-[10px]"
+              >
+                Save
+              </button>
+              <label className="retro-button px-2 py-1 text-[10px] cursor-default">
+                Open
+                <input
+                  type="file"
+                  onChange={loadProject}
+                  className="hidden"
+                  accept=".json"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={generateAscii}
+                className="retro-button px-3 py-1 text-[10px] font-bold text-[var(--os-titlebar)] border-blue-600"
+              >
+                Export ASCII
+              </button>
+            </div>
+
+            {/* Tools Group */}
+            <div className="flex gap-1 items-center">
+              {getAllExtensions().map((ext) => (
+                <button
+                  key={ext.type}
+                  type="button"
+                  onClick={() => addExtensionElement(ext.type)}
+                  className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px]"
+                  title={`Add ${ext.label}`}
+                >
+                  <ext.icon size={12} /> {ext.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowCollab(true)}
-              className={`retro-button px-1 py-0 text-[10px] flex items-center gap-1 ${status === "connected" ? "text-green-600 font-bold" : ""}`}
-              title="Collaborate Live"
+              className={`retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] ${status === "connected" ? "text-green-600 font-bold" : ""}`}
             >
-              {status === "connected" ? (
-                <Wifi className="w-2 h-2" />
-              ) : (
-                <Users className="w-2 h-2" />
-              )}
-              {status === "connected" ? `SYNC: ${channelId}` : "Collab"}
+              <Users size={12} /> Collaborate
             </button>
-            <button
-              type="button"
-              onClick={saveProject}
-              className="retro-button px-1 py-0 text-[10px]"
-              title="Save Project"
-            >
-              Save
-            </button>
-            <label className="retro-button px-1 py-0 text-[10px] cursor-default">
-              Open
-              <input
-                type="file"
-                onChange={loadProject}
-                className="hidden"
-                accept=".json"
-              />
-            </label>
             <Link
               href="/docs"
-              className="retro-button px-1 py-0 text-[10px] no-underline flex items-center gap-1"
-              title="Documentation"
+              className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] no-underline"
             >
-              <Book className="w-2 h-2" /> Docs
+              <Book size={12} /> Help
             </Link>
-            <button
-              type="button"
-              className="retro-button px-1 py-0 leading-none h-4 w-4 flex items-center justify-center font-bold"
-            >
-              ✕
-            </button>
           </div>
         </div>
-        <div className="p-2 flex flex-col gap-2">
-          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[var(--os-border-dark)] border-b border-[var(--os-border-light)] pb-2 relative">
-            <div className="absolute -top-[1px] left-0 right-0 h-[1px] bg-[var(--os-border-light)]" />
-            <div className="absolute -bottom-[1px] left-0 right-0 h-[1px] bg-[var(--os-border-dark)]" />
 
-            {getAllExtensions().map((ext) => (
+        {/* Contextual Property Bar */}
+        {selectedId && (
+          <div className="flex items-center px-4 py-1.5 bg-white/40 border-t border-gray-300 gap-6 text-[9px] uppercase font-bold text-gray-700 animate-in slide-in-from-top duration-200">
+            <div className="flex items-center gap-2">
+              <span className="opacity-40">Object:</span>
+              <span className="bg-white px-1 border border-gray-300">
+                {selectedElement?.type}
+              </span>
+            </div>
+            <div className="flex gap-3">
               <button
-                key={ext.type}
                 type="button"
-                onClick={() => addExtensionElement(ext.type)}
-                className="retro-button flex items-center gap-1"
-                title={`Add ${ext.label}`}
+                onClick={setCenter}
+                className={`flex items-center gap-1 hover:text-[var(--os-titlebar)] ${elements.find((e) => e.id === selectedId)?.isCenter ? "text-blue-600" : ""}`}
               >
-                <ext.icon className="w-3 h-3" /> {ext.label}
+                <GripHorizontal size={12} /> Set View Center
               </button>
-            ))}
-
-            {selectedId && (
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={setCenter}
-                  className={`retro-button flex items-center gap-1 ${elements.find((e) => e.id === selectedId)?.isCenter ? "text-blue-600 font-bold" : ""}`}
-                  title="Set as View Center"
-                >
-                  <GripHorizontal className="w-3 h-3" /> Center
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteSelected()}
-                  className="retro-button flex items-center gap-1"
-                  title="Delete selected"
-                >
-                  <Trash2 className="w-3 h-3" /> Delete
-                </button>
-              </div>
-            )}
+              <button
+                type="button"
+                onClick={() => deleteSelected()}
+                className="flex items-center gap-1 hover:text-red-600"
+              >
+                <Trash2 size={12} /> Delete Element
+              </button>
+            </div>
           </div>
-
-          <button
-            type="button"
-            onClick={generateAscii}
-            className="retro-button flex items-center justify-center gap-2 mt-1 py-1"
-          >
-            <GripHorizontal className="w-3 h-3" /> Export ASCII
-          </button>
-        </div>
+        )}
       </div>
 
       {contextMenu && (
@@ -1308,7 +1337,7 @@ const AsciiEditor: React.FC = () => {
                 ✕
               </button>
             </div>
-            <div className="p-2 flex-1 flex flex-col gap-2 overflow-hidden bg-[var(--os-bg)]">
+            <div className="p-2 flex-1 flex flex-col gap-2 overflow-hidden bg-(--os-bg)">
               <div className="window-sunken flex-1 overflow-auto p-2">
                 <pre className="terminal-output whitespace-pre m-0 min-h-full">
                   {ascii}
