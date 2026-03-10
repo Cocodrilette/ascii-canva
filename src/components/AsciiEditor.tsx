@@ -18,24 +18,13 @@ import type { VectorElement } from "../extensions/builtin/vector";
 import { getAllExtensions, getExtension } from "../extensions/registry";
 import type { BaseElement } from "../extensions/types";
 import { useRealtime } from "../hooks/useRealtime";
+import { isInside } from "../utils/geometry";
 // Removed packElements and unpackElements imports as we use JSON now
 import CollabModal from "./CollabModal";
 
 const CELL_SIZE = 14;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4.0;
-
-const isInside = (child: BaseElement, parent: BaseElement) => {
-  if (child.id === parent.id) return false;
-  const childBounds = getExtension(child.type).getBounds(child);
-  const parentBounds = getExtension(parent.type).getBounds(parent);
-  return (
-    childBounds.left >= parentBounds.left &&
-    childBounds.right <= parentBounds.right &&
-    childBounds.top >= parentBounds.top &&
-    childBounds.bottom <= parentBounds.bottom
-  );
-};
 
 const AsciiEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);

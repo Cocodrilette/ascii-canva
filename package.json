@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "biome check",
     "format": "biome format --write",
-    "db": "./scripts/db.sh"
+    "db": "./scripts/db.sh",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.0",
@@ -25,9 +27,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/ui": "^4.0.18",
     "supabase": "^2.77.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vercel": "^50.29.0"
+    "vercel": "^50.29.0",
+    "vitest": "^4.0.18"
   }
 }
