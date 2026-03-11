@@ -804,7 +804,7 @@ const AsciiEditor: React.FC = () => {
         );
       } else if (isDragging && selectedIds.length > 0) {
         const dx = gridX - dragOffset.current.x;
-        const dy = gridY - gridY - dragOffset.current.y;
+        const dy = gridY - dragOffset.current.y;
         if (dx !== 0 || dy !== 0) {
           hasDragged.current = true;
           const movedIds = [...selectedIds, ...capturedIds];
