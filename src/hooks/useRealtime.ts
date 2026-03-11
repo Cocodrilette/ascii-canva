@@ -2,98 +2,165 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseElement } from "../extensions/types";
 import { supabase } from "../lib/supabase";
 
+export interface SpaceMetadata {
+  id: string;
+  slug: string;
+  name?: string;
+  owner_id?: string;
+}
+
 export const useRealtime = (
-  initialChannelId: string,
-  onData?: (elements: BaseElement[]) => void,
+  initialSlug: string,
+  onRemoteSync?: (elements: BaseElement[]) => void, // Fallback for broadcast
+  onElementCreated?: (element: BaseElement) => void,
+  onElementUpdated?: (element: BaseElement) => void,
+  onElementDeleted?: (id: string) => void,
 ) => {
   const [peerId] = useState(() =>
     Math.random().toString(36).substr(2, 6).toUpperCase(),
   );
-  const [channelId, _setChannelId] = useState(initialChannelId);
+  const [slug, setSlug] = useState(initialSlug);
+  const [space, setSpace] = useState<SpaceMetadata | null>(null);
   const [status, setStatus] = useState<
-    "idle" | "connecting" | "connected" | "failed"
+    "idle" | "loading" | "connected" | "failed"
   >("idle");
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const onDataRef = useRef(onData);
 
+  // 1. Load/Ensure Space (Attempt Persistence)
   useEffect(() => {
-    onDataRef.current = onData;
-  }, [onData]);
+    if (!slug) {
+      setStatus("idle");
+      setSpace(null);
+      return;
+    }
 
-  const sendData = useCallback(
-    async (elements: BaseElement[]) => {
-      if (!channelRef.current || status !== "connected") return;
+    const loadSpace = async () => {
+      setStatus("loading");
+      
+      try {
+        let { data: spaceData } = await supabase
+          .from("spaces")
+          .select("*")
+          .eq("slug", slug)
+          .single();
 
-      await channelRef.current.send({
-        type: "broadcast",
-        event: "sync",
-        payload: {
-          sender_id: peerId,
-          elements,
-        },
-      });
-    },
-    [peerId, status],
-  );
+        if (!spaceData) {
+          const { data: { user } } = await supabase.auth.getUser();
+          const { data: newSpace, error: createError } = await supabase
+            .from("spaces")
+            .insert({ slug, owner_id: user?.id, name: `Space ${slug}` })
+            .select()
+            .single();
+          
+          if (!createError) spaceData = newSpace;
+        }
 
-  const setChannelId = (id: string) => {
-    _setChannelId(id);
-  };
+        if (spaceData) {
+          setSpace(spaceData);
+        }
+      } catch (err) {
+        console.warn("[REALTIME] Database unavailable, falling back to ephemeral mode.");
+      }
+      
+      setStatus("connected");
+    };
 
+    loadSpace();
+  }, [slug]);
+
+  // 2. Combined Subscription (Postgres + Broadcast)
   useEffect(() => {
-    if (!channelId) return;
+    if (!slug) return;
 
-    console.log(`[REALTIME] Subscribing to channel: ${channelId}`);
-    setStatus("connecting");
-
-    const channel = supabase.channel(`canvas:${channelId}`, {
+    const channelName = space?.id ? `space:${space.id}` : `broadcast:${slug}`;
+    const channel = supabase.channel(channelName, {
       config: {
         broadcast: { self: false },
-        presence: { key: peerId },
       },
     });
 
     channelRef.current = channel;
 
-    channel
-      .on("broadcast", { event: "sync" }, ({ payload }) => {
-        if (payload.sender_id === peerId) return;
-        console.log(`[REALTIME] Received sync from ${payload.sender_id}`);
-        if (onDataRef.current) onDataRef.current(payload.elements);
-      })
-      .on("broadcast", { event: "request-state" }, ({ payload }) => {
-        if (payload.sender_id === peerId) return;
-        console.log(`[REALTIME] State requested by ${payload.sender_id}`);
-        // Notify the component to broadcast its state
-        window.dispatchEvent(
-          new CustomEvent("canvas:request-state", {
-            detail: { requester_id: payload.sender_id },
-          }),
-        );
-      })
-      .subscribe((subStatus) => {
-        console.log(`[REALTIME] Status: ${subStatus}`);
-        if (subStatus === "SUBSCRIBED") {
-          setStatus("connected");
-          // Request current state from existing peers
-          channel.send({
-            type: "broadcast",
-            event: "request-state",
-            payload: { sender_id: peerId },
-          });
-        } else if (subStatus === "CHANNEL_ERROR") {
-          setStatus("failed");
+    // A. Listen to Broadcast (Offline/Ephemeral Fallback)
+    channel.on("broadcast", { event: "sync" }, ({ payload }) => {
+      if (payload.sender_id === peerId) return;
+      onRemoteSync?.(payload.elements);
+    });
+
+    // B. Listen to Postgres Changes (If Space exists)
+    if (space?.id) {
+      channel.on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "elements",
+          filter: `space_id=eq.${space.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            onElementCreated?.(payload.new as BaseElement);
+          } else if (payload.eventType === "UPDATE") {
+            onElementUpdated?.(payload.new as BaseElement);
+          } else if (payload.eventType === "DELETE") {
+            onElementDeleted?.(payload.old.id);
+          }
         }
-      });
+      );
+    }
+
+    channel.subscribe();
 
     return () => {
-      console.log(`[REALTIME] Unsubscribing from channel: ${channelId}`);
       supabase.removeChannel(channel);
       channelRef.current = null;
-      setStatus("idle");
     };
-  }, [channelId, peerId]);
+  }, [slug, space?.id, peerId, onRemoteSync, onElementCreated, onElementUpdated, onElementDeleted]);
 
-  return { peerId, channelId, status, setChannelId, sendData };
+  // Sync Helpers
+  const sendBroadcastSync = useCallback((elements: BaseElement[]) => {
+    if (!channelRef.current) return;
+    channelRef.current.send({
+      type: "broadcast",
+      event: "sync",
+      payload: { sender_id: peerId, elements },
+    });
+  }, [peerId]);
+
+  const addElementToDb = useCallback(async (element: Omit<BaseElement, 'id'>) => {
+    if (!space?.id) return null;
+    const { data: { user } } = await supabase.auth.getUser();
+    return await supabase.from("elements").insert({
+      ...element,
+      space_id: space.id,
+      created_by: user?.id
+    }).select().single();
+  }, [space?.id]);
+
+  const updateElementInDb = useCallback(async (id: string, updates: Partial<BaseElement>) => {
+    if (!space?.id) return;
+    return await supabase.from("elements")
+      .update(updates)
+      .eq("id", id);
+  }, [space?.id]);
+
+  const deleteElementFromDb = useCallback(async (id: string) => {
+    if (!space?.id) return;
+    return await supabase.from("elements")
+      .delete()
+      .eq("id", id);
+  }, [space?.id]);
+
+  return { 
+    peerId, 
+    slug, 
+    space, 
+    status, 
+    setSlug, 
+    sendBroadcastSync,
+    addElementToDb,
+    updateElementInDb,
+    deleteElementFromDb 
+  };
 };

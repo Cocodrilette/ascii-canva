@@ -215,6 +215,66 @@ export default function Docs() {
           </div>
         </div>
 
+        {/* API Reference Section */}
+        <div className="space-y-4">
+          <h2 className="flex items-center gap-2 font-bold uppercase text-sm px-2 font-['VT323']">
+            <Share2 size={16} />
+            <span>API Reference</span>
+          </h2>
+
+          <div className="window-sunken p-6 space-y-6 border-t-2 border-l-2 border-[#808080] border-r-2 border-b-2 border-white bg-white">
+            <div className="space-y-4 font-['MS_Sans_Serif']">
+              <h3 className="font-bold text-[10px] uppercase border-b border-[#C0C0C0] pb-1">
+                Add Elements via API
+              </h3>
+              <p className="text-[10px] opacity-80">
+                You can programmatically add elements to any space using your API Key. 
+                Identify the space by its unique <strong>Slug</strong> or <strong>UUID</strong>.
+              </p>
+
+              <div className="bg-gray-50 p-3 border border-gray-200 rounded text-[10px] space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="bg-green-600 text-white px-1.5 py-0.5 rounded font-bold">POST</span>
+                  <code className="font-bold">/api/spaces/[id]/elements</code>
+                </div>
+                <div className="text-gray-500 italic">Header: X-API-KEY: ac_your_key_here</div>
+              </div>
+
+              <h4 className="font-bold text-[9px] uppercase mt-4">Example: cURL</h4>
+              <ModernCodeBlock
+                language="bash"
+                code={`curl -X POST https://ascii-canva.vercel.app/api/spaces/ABCD/elements \\
+  -H "X-API-KEY: ac_your_api_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "type": "text",
+    "x": 10,
+    "y": 5,
+    "params": { "text": "Hello from API!" }
+  }'`}
+              />
+
+              <h4 className="font-bold text-[9px] uppercase mt-4">Example: Fetch (JavaScript)</h4>
+              <ModernCodeBlock
+                language="javascript"
+                code={`await fetch('/api/spaces/ABCD/elements', {
+  method: 'POST',
+  headers: {
+    'X-API-KEY': 'ac_your_api_key',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    type: 'box',
+    x: 20,
+    y: 10,
+    params: { width: 10, height: 5 }
+  })
+});`}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="text-center p-8">
           <p className="ui-label opacity-40 uppercase tracking-widest font-['MS_Sans_Serif'] text-[9px]">

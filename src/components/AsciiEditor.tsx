@@ -4,6 +4,7 @@ import {
   Download,
   FileText,
   GripHorizontal,
+  Key,
   Layers,
   Puzzle,
   Terminal,
@@ -20,14 +21,17 @@ import type { TextElement } from "../extensions/builtin/text";
 import type { VectorElement } from "../extensions/builtin/vector";
 import { getAllExtensions, getExtension, hasExtension } from "../extensions/registry";
 import type { BaseElement } from "../extensions/types";
+import { supabase } from "../lib/supabase";
 import { useExtensions } from "../hooks/useExtensions";
 
 import { useRealtime } from "../hooks/useRealtime";
 import { isInside } from "../utils/geometry";
 // Removed packElements and unpackElements imports as we use JSON now
+import ApiKeyModal from "./ApiKeyModal";
 import CollabModal from "./CollabModal";
 import { ExtensionMarketplace } from "./ExtensionMarketplace";
 import LayerManager from "./LayerManager";
+import SpaceManagerModal from "./SpaceManagerModal";
 import Taskbar from "./Taskbar";
 import { TutorialModal } from "./TutorialModal";
 
@@ -74,6 +78,8 @@ const AsciiEditor: React.FC = () => {
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showExplorer, setShowExplorer] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [showSpacesModal, setShowSpacesModal] = useState(false);
 
   useEffect(() => {
     const hasSeenTutorial = localStorage.getItem("ascii-seen-tutorial");
@@ -115,15 +121,9 @@ const AsciiEditor: React.FC = () => {
       getExtension("text").create(50, 10, { text: "EXTENSIBLE PRIMITIVES:" }),
       
       // Box Example
-      getExtension("box").create(50, 12, { width: 12, height: 5 }),
-      getExtension("text").create(51, 13, { text: "Resizable" }),
-      getExtension("text").create(51, 14, { text: "Containers" }),
-
-      // Vector Example
-      getExtension("text").create(70, 12, { text: "Smart Vectors" }),
-      getExtension("vector").create(70, 14, { x2: 85, y2: 14 }),
-      getExtension("text").create(70, 16, { text: "Connect them to boxes" }),
-      getExtension("text").create(70, 17, { text: "to create diagrams!" }),
+      getExtension("box").create(70, 12, { width: 12, height: 5 }),
+      getExtension("text").create(71, 13, { text: "Resizable" }),
+      getExtension("text").create(71, 14, { text: "Containers" }),
 
       // A little bit of "Art"
       getExtension("text").create(10, 24, { text: "  _   _  " }),
@@ -241,10 +241,58 @@ const AsciiEditor: React.FC = () => {
     [centerView],
   );
 
-  const { peerId, channelId, status, setChannelId, sendData } = useRealtime(
+  const onElementCreated = useCallback((el: any) => {
+    const flattened = { ...el, ...el.params };
+    setElements(prev => {
+      if (prev.find(e => e.id === flattened.id)) return prev;
+      return [...prev, flattened];
+    });
+  }, []);
+
+  const onElementUpdated = useCallback((el: any) => {
+    const flattened = { ...el, ...el.params };
+    setElements(prev => prev.map(e => e.id === flattened.id ? flattened : e));
+  }, []);
+
+  const onElementDeleted = useCallback((id: string) => {
+    setElements(prev => prev.filter(e => e.id !== id));
+  }, []);
+
+  const { 
+    peerId, 
+    slug: channelId, 
+    space,
+    status, 
+    setSlug: setChannelId, 
+    sendBroadcastSync: sendData,
+    addElementToDb,
+    updateElementInDb,
+    deleteElementFromDb
+  } = useRealtime(
     "",
     onRemoteData,
+    onElementCreated,
+    onElementUpdated,
+    onElementDeleted
   );
+
+  // Load existing elements from DB when joining a space
+  useEffect(() => {
+    if (space?.id) {
+      const fetchElements = async () => {
+        const { data, error } = await supabase
+          .from("elements")
+          .select("*")
+          .eq("space_id", space.id);
+        
+        if (!error && data) {
+          const flattened = data.map((el: any) => ({ ...el, ...el.params }));
+          setElements(flattened as BaseElement[]);
+        }
+      };
+      fetchElements();
+    }
+  }, [space?.id]);
 
   const setCenter = useCallback(() => {
     if (selectedIds.length !== 1) return;
@@ -505,8 +553,9 @@ const AsciiEditor: React.FC = () => {
         const selected = elements.find((el) => el.id === selectedIds[0]);
         if (selected?.type === "vector" || selected?.type === "line") {
           const vec = selected as VectorElement | LineElement;
-          for (let i = 0; i < vec.points.length; i++) {
-            const p = vec.points[i];
+          const points = vec.points;
+          for (let i = 0; i < points.length; i++) {
+            const p = points[i];
             const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
             const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
             if (Math.abs(mouseX - px) < 15 && Math.abs(mouseY - py) < 15) {
@@ -561,8 +610,9 @@ const AsciiEditor: React.FC = () => {
         prev.map((el) => {
           if (el.id === elementId && (el.type === "vector" || el.type === "line")) {
             const vec = el as VectorElement | LineElement;
-            if (vec.points.length <= 2) return el; // Minimum 2 points
-            const newPoints = [...vec.points];
+            const points = vec.points;
+            if (points.length <= 2) return el; // Minimum 2 points
+            const newPoints = [...points];
             newPoints.splice(pointIndex, 1);
             return {
               ...vec,
@@ -572,7 +622,7 @@ const AsciiEditor: React.FC = () => {
               // If we delete start/end, we might want to clear connection
               startElementId: pointIndex === 0 ? undefined : vec.startElementId,
               endElementId:
-                pointIndex === vec.points.length - 1
+                pointIndex === points.length - 1
                   ? undefined
                   : vec.endElementId,
             };
@@ -633,8 +683,9 @@ const AsciiEditor: React.FC = () => {
           prev.map((el) => {
             if (el.id === selectedIds[0] && (el.type === "vector" || el.type === "line")) {
               const vec = el as VectorElement | LineElement;
+              const points = vec.points;
               const isStart = draggedPointIndex === 0;
-              const isEnd = draggedPointIndex === vec.points.length - 1;
+              const isEnd = draggedPointIndex === points.length - 1;
 
               let finalX = gridX;
               let finalY = gridY;
@@ -673,7 +724,7 @@ const AsciiEditor: React.FC = () => {
                 }
               }
 
-              const newPoints = [...vec.points];
+              const newPoints = [...points];
               newPoints[draggedPointIndex] = { x: finalX, y: finalY };
 
               return {
@@ -699,7 +750,8 @@ const AsciiEditor: React.FC = () => {
               if (movedIds.includes(el.id)) {
                 if (el.type === "vector" || el.type === "line") {
                   const vec = el as VectorElement | LineElement;
-                  const newPoints = vec.points.map((p) => ({
+                  const points = vec.points;
+                  const newPoints = points.map((p) => ({
                     x: p.x + dx,
                     y: p.y + dy,
                   }));
@@ -715,7 +767,8 @@ const AsciiEditor: React.FC = () => {
               if (el.type === "vector" || el.type === "line") {
                 const vec = el as VectorElement | LineElement;
                 let changed = false;
-                const newPoints = [...vec.points];
+                const points = vec.points;
+                const newPoints = [...points];
                 if (
                   vec.startElementId &&
                   movedIds.includes(vec.startElementId)
@@ -830,10 +883,11 @@ const AsciiEditor: React.FC = () => {
         } else if (draggedPointIndex !== null && selectedIds.length === 1) {
           setElements((prev) =>
             prev.map((el) => {
-              if (el.id === selectedIds[0] && el.type === "vector") {
-                const vec = el as VectorElement;
+              if (el.id === selectedIds[0] && (el.type === "vector" || el.type === "line")) {
+                const vec = el as VectorElement | LineElement;
+                const points = vec.points;
                 const isStart = draggedPointIndex === 0;
-                const isEnd = draggedPointIndex === vec.points.length - 1;
+                const isEnd = draggedPointIndex === points.length - 1;
 
                 let finalX = gridX;
                 let finalY = gridY;
@@ -844,6 +898,7 @@ const AsciiEditor: React.FC = () => {
                     (other) =>
                       !selectedIds.includes(other.id) &&
                       other.type !== "vector" &&
+                      other.type !== "line" &&
                       gridX >= getExtension(other.type).getBounds(other).left &&
                       gridX < getExtension(other.type).getBounds(other).right &&
                       gridY >= getExtension(other.type).getBounds(other).top &&
@@ -871,7 +926,7 @@ const AsciiEditor: React.FC = () => {
                   }
                 }
 
-                const newPoints = [...vec.points];
+                const newPoints = [...points];
                 newPoints[draggedPointIndex] = { x: finalX, y: finalY };
 
                 return {
@@ -886,7 +941,8 @@ const AsciiEditor: React.FC = () => {
               return el;
             }),
           );
-        } else if (isDragging && selectedIds.length > 0) {
+        }
+ else if (isDragging && selectedIds.length > 0) {
           const dx = gridX - dragOffset.current.x;
           const dy = gridY - dragOffset.current.y;
           if (dx !== 0 || dy !== 0) {
@@ -1033,17 +1089,18 @@ const AsciiEditor: React.FC = () => {
 
       if (selected?.type === "vector" || selected?.type === "line") {
         const vec = selected as VectorElement | LineElement;
-        for (let i = 0; i < vec.points.length; i++) {
-          const p = vec.points[i];
+        const points = vec.points;
+        for (let i = 0; i < points.length; i++) {
+          const p = points[i];
           const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
           const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
 
           if (Math.abs(mouseX - px) < 15 && Math.abs(mouseY - py) < 15) {
-            if (e.detail === 2 && vec.points.length < 10) {
+            if (e.detail === 2 && points.length < 10) {
               // Double click: add point after this one
               pushToHistory();
-              const nextIdx = (i + 1) % vec.points.length;
-              const nextP = vec.points[nextIdx];
+              const nextIdx = (i + 1) % points.length;
+              const nextP = points[nextIdx];
               const newP = {
                 x: Math.round((p.x + nextP.x) / 2),
                 y: Math.round((p.y + nextP.y) / 2),
@@ -1052,7 +1109,8 @@ const AsciiEditor: React.FC = () => {
                 prev.map((el) => {
                   if (el.id === selectedIds[0]) {
                     const v = el as VectorElement | LineElement;
-                    const newPoints = [...v.points];
+                    const vPoints = v.points;
+                    const newPoints = [...vPoints];
                     newPoints.splice(i + 1, 0, newP);
                     return { ...v, points: newPoints };
                   }
@@ -1175,8 +1233,9 @@ const AsciiEditor: React.FC = () => {
 
         if (selected?.type === "vector" || selected?.type === "line") {
           const vec = selected as VectorElement | LineElement;
-          for (let i = 0; i < vec.points.length; i++) {
-            const p = vec.points[i];
+          const points = vec.points;
+          for (let i = 0; i < points.length; i++) {
+            const p = points[i];
             const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
             const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
 
@@ -1550,6 +1609,22 @@ const AsciiEditor: React.FC = () => {
             </button>
             <button
               type="button"
+              onClick={() => setShowSpacesModal(true)}
+              className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px]"
+              title="Manage Spaces"
+            >
+              <Layers size={12} /> Spaces
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowApiKeyModal(true)}
+              className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px]"
+              title="Manage API Keys"
+            >
+              <Key size={12} /> API Keys
+            </button>
+            <button
+              type="button"
               onClick={() => setShowCollab(true)}
               className={`retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] ${status === "connected" ? "text-green-600 font-bold" : ""}`}
             >
@@ -1695,6 +1770,19 @@ const AsciiEditor: React.FC = () => {
         channelId={channelId}
         status={status}
         onStartHost={startCollaboration}
+      />
+
+      <ApiKeyModal
+        isOpen={showApiKeyModal}
+        onClose={() => setShowApiKeyModal(false)}
+      />
+
+      <SpaceManagerModal
+        isOpen={showSpacesModal}
+        onClose={() => setShowSpacesModal(false)}
+        onSwitchSpace={(slug) => {
+          window.location.href = `${window.location.pathname}?join=${slug}`;
+        }}
       />
 
       {showMarketplace && (

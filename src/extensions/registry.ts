@@ -42,11 +42,6 @@ class ExtensionRegistry {
 
 export const extensionRegistry = new ExtensionRegistry();
 
-// For backward compatibility if any file imports 'extensions' directly
-export const extensions = new Proxy({} as Record<string, AsciiExtension<any, any>>, {
-  get: (_, prop: string) => extensionRegistry.get(prop),
-});
-
 export const getExtension = (type: string) => extensionRegistry.get(type);
 export const hasExtension = (type: string) => extensionRegistry.exists(type);
 export const getAllExtensions = () => extensionRegistry.getAll();
