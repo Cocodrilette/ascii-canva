@@ -1,120 +1,86 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-os-bg: #c0c0c0;
-  --color-os-surface: #ffffff;
-  --color-os-titlebar: #000080;
-  --color-os-titlebar-text: #ffffff;
-  --color-os-border-light: #ffffff;
-  --color-os-border-dark: #808080;
-  --color-os-accent: #000080;
-  --color-os-terminal: #0d0d0d;
-  --color-os-green: #00ff41;
+  --color-glass-bg: rgba(255, 255, 255, 0.6);
+  --color-glass-border: rgba(255, 255, 255, 0.4);
+  --color-glass-shadow: rgba(0, 0, 0, 0.1);
 }
 
 :root {
-  --os-bg: #c0c0c0;
-  --os-surface: #ffffff;
-  --os-titlebar: #000080;
-  --os-titlebar-text: #ffffff;
-  --os-border-light: #ffffff;
-  --os-border-dark: #808080;
-  --os-accent: #000080;
-  --os-terminal: #0d0d0d;
-  --os-green: #00ff41;
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  --glass-blur: blur(20px);
+  
+  /* Genesis Palette */
+  --genesis-primary: #000080;
+  --genesis-accent: #00FF41;
+  --genesis-zinc-900: #18181b;
 }
 
-body {
-  background: var(--os-bg);
-  color: #000000;
-  font-family: "Times New Roman", serif;
-  font-size: 14px;
-  cursor: default;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
+@layer base {
+  body {
+    background: radial-gradient(circle at top left, #f8fafc, #e2e8f0);
+    color: var(--genesis-zinc-900);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    cursor: default;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    @apply min-h-screen;
+  }
+
+  /* Transition for smooth redesign */
+  * {
+    @apply transition-all duration-300 ease-out;
+  }
 }
 
-a,
-button,
-input,
-textarea,
-select {
-  cursor: default;
+@utility glass-surface {
+  background-color: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
 }
 
-.window-raised {
-  border-top: 2px solid var(--os-border-light);
-  border-left: 2px solid var(--os-border-light);
-  border-right: 2px solid var(--os-border-dark);
-  border-bottom: 2px solid var(--os-border-dark);
-  background: var(--os-bg);
+@utility glass-surface-dark {
+  background-color: rgba(24, 24, 27, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 }
 
-.window-sunken {
-  border-top: 2px solid var(--os-border-dark);
-  border-left: 2px solid var(--os-border-dark);
-  border-right: 2px solid var(--os-border-light);
-  border-bottom: 2px solid var(--os-border-light);
-  background: var(--os-surface);
+@utility glass-floating {
+  @apply glass-surface rounded-3xl;
 }
 
-.title-bar {
-  background: var(--os-titlebar);
-  color: var(--os-titlebar-text);
-  font-family: "VT323", "Courier New", monospace;
-  font-size: 13px;
-  padding: 2px 4px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+@utility genesis-button {
+  @apply px-4 py-2 rounded-xl bg-white/80 border border-white/20 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 text-sm font-medium;
 }
 
-.ui-label {
-  font-family: "MS Sans Serif", sans-serif;
-  font-size: 11px;
+@utility genesis-button-primary {
+  @apply bg-[#000080] text-white border-none shadow-blue-900/20;
 }
 
-.terminal-output {
-  font-family: "Courier New", monospace;
-  font-size: 13px;
-  background: var(--os-terminal);
-  color: var(--os-green);
+/* Compatibility Layer */
+@utility window-raised {
+  @apply glass-floating;
 }
 
-.retro-button {
-  padding: 2px 8px;
-  background: var(--os-bg);
-  color: #000000;
-  border-top: 2px solid var(--os-border-light);
-  border-left: 2px solid var(--os-border-light);
-  border-right: 2px solid var(--os-border-dark);
-  border-bottom: 2px solid var(--os-border-dark);
-  font-family: "MS Sans Serif", sans-serif;
-  font-size: 11px;
-  user-select: none;
+@utility window-sunken {
+  @apply bg-white/40 backdrop-blur-md border border-black/5 rounded-2xl;
 }
 
-.retro-button:active {
-  border-top: 2px solid var(--os-border-dark);
-  border-left: 2px solid var(--os-border-dark);
-  border-right: 2px solid var(--os-border-light);
-  border-bottom: 2px solid var(--os-border-light);
-  padding-top: 3px;
-  padding-bottom: 1px;
-  padding-left: 9px;
-  padding-right: 7px;
+@utility retro-button {
+  @apply genesis-button;
 }
 
-.retro-input {
-  border-top: 2px solid var(--os-border-dark);
-  border-left: 2px solid var(--os-border-dark);
-  border-right: 2px solid var(--os-border-light);
-  border-bottom: 2px solid var(--os-border-light);
-  background: var(--os-surface);
-  color: #000000;
-  padding: 2px 4px;
-  font-family: "MS Sans Serif", sans-serif;
-  font-size: 11px;
-  outline: none;
+@utility retro-input {
+  @apply bg-white/40 backdrop-blur-md border border-black/10 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/20;
+}
+
+/* Sileo Overrides for Genesis */
+.sileo-toast {
+  @apply !rounded-2xl !backdrop-blur-2xl !border-white/40 !shadow-2xl;
 }

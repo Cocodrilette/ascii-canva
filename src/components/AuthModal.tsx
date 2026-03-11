@@ -1,6 +1,7 @@
 import { X, Lock, Mail, UserPlus, LogIn, AlertCircle } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { sileo } from "sileo";
 import { supabase } from "../lib/supabase";
 
 interface AuthModalProps {
@@ -34,7 +35,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
           password,
         });
         if (signupError) throw signupError;
-        alert("Verification email sent! Check your inbox.");
+        sileo.success({ title: "Authorization Dispatched", description: "Verification signal sent to your inbox." });
       }
       
       if (onSuccess) onSuccess();

@@ -1,6 +1,12 @@
 import "@/styles/globals.css";
 import type { AppProps } from "next/app";
+import { Toaster } from "sileo";
 
 export default function App({ Component, pageProps }: AppProps) {
-  return <Component {...pageProps} />;
+  return (
+    <>
+      <Toaster position="top-right" />
+      <Component {...pageProps} />
+    </>
+  );
 }

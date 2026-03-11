@@ -1,4 +1,4 @@
-import { Copy, Link, Shield, Users, Wifi } from "lucide-react";
+import { Copy, Link, Shield, Users, Wifi, X, Check } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 
@@ -30,142 +30,127 @@ const CollabModal: React.FC<CollabModalProps> = ({
 
   const copyUrl = async () => {
     try {
-      // Try the modern Clipboard API first
       await navigator.clipboard.writeText(collabUrl);
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 2000);
     } catch (err) {
-      console.warn("Modern clipboard API failed, trying fallback...", err);
-      
-      // Fallback: Using a hidden textarea
-      try {
-        const textArea = document.createElement("textarea");
-        textArea.value = collabUrl;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        textArea.style.top = "-9999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        const successful = document.execCommand("copy");
-        document.body.removeChild(textArea);
-        
-        if (successful) {
-          setCopyFeedback(true);
-          setTimeout(() => setCopyFeedback(false), 2000);
-        }
-      } catch (fallbackErr) {
-        console.error("Fallback copy failed:", fallbackErr);
-      }
+      console.warn("Clipboard API failed");
     }
   };
 
-  const statusColors = {
-    idle: "text-gray-500",
-    connecting: "text-yellow-600 animate-pulse",
-    connected: "text-green-600 font-bold",
-    failed: "text-red-600",
-    loading: "text-blue-600",
+  const statusConfig = {
+    idle: { color: "bg-zinc-100 text-zinc-500", label: "Idle" },
+    connecting: { color: "bg-yellow-100 text-yellow-700 animate-pulse", label: "Linking" },
+    connected: { color: "bg-green-100 text-green-700 font-bold", label: "Active" },
+    failed: { color: "bg-red-100 text-red-700", label: "Failed" },
+    loading: { color: "bg-blue-100 text-blue-700", label: "Syncing" },
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
-      <div className="window-raised w-full max-w-md shadow-[4px_4px_0_rgba(0,0,0,0.5)]">
-        <div className="title-bar">
-          <span className="flex items-center gap-2 font-bold">
-            <Users className="w-3 h-3" /> Collaboration_Manager.exe
-          </span>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="glass-floating w-full max-w-md shadow-2xl m-4 flex flex-col border-white/30 animate-in zoom-in-95 duration-300 overflow-hidden">
+        {/* Header */}
+        <div className="bg-[#000080]/10 px-4 py-4 flex items-center justify-between border-b border-white/20">
+          <div className="flex items-center gap-3 text-[#000080]">
+            <div className="bg-[#000080] p-1.5 rounded-lg text-white shadow-lg shadow-blue-900/20">
+              <Users size={18} />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-sm tracking-tight">Collaboration Hub</span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">REALTIME_ENGINE.V1</span>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="retro-button px-1 py-0 leading-none h-4 w-4 flex items-center justify-center font-bold"
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-zinc-400 hover:text-red-500 transition-all"
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
 
-        <div className="p-4 flex flex-col gap-4 bg-[var(--os-bg)]">
-          <div className="window-sunken p-3 bg-white flex flex-col gap-2">
+        <div className="p-6 flex flex-col gap-6">
+          <div className="bg-white/40 p-4 rounded-2xl border border-white/60 flex flex-col gap-3 shadow-inner">
             <div className="flex justify-between items-center">
-              <span className="ui-label text-xs uppercase opacity-70">
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
                 Local Peer ID
               </span>
-              <span className="font-mono text-sm font-bold bg-blue-50 px-1 border border-blue-200">
+              <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
                 {peerId}
               </span>
             </div>
 
-            <div className="flex justify-between items-center border-t border-gray-100 pt-2">
-              <span className="ui-label text-xs uppercase opacity-70">
-                Connection Status
+            <div className="flex justify-between items-center border-t border-white/60 pt-3">
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                Nexus Status
               </span>
               <span
-                className={`flex items-center gap-1 text-sm ${statusColors[status]}`}
+                className={`flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight ${statusConfig[status].color}`}
               >
-                {status === "connected" && <Wifi className="w-3 h-3" />}
-                {status.toUpperCase()}
+                {status === "connected" && <Wifi size={12} className="animate-pulse" />}
+                {statusConfig[status].label}
               </span>
             </div>
           </div>
 
           {!channelId ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-xs text-gray-600 leading-relaxed italic">
-                Hosting a session allows you to share your ASCII canvas in
-                real-time with others via Supabase Realtime.
+            <div className="flex flex-col gap-4 py-4 text-center">
+              <p className="text-xs text-zinc-500 leading-relaxed max-w-[280px] mx-auto">
+                Establish a neural link to share your ASCII canvas in real-time with remote operators.
               </p>
               <button
                 type="button"
                 onClick={onStartHost}
-                className="retro-button py-2 flex items-center justify-center gap-2 w-full font-bold text-sm"
+                className="genesis-button genesis-button-primary py-3 flex items-center justify-center gap-3 w-full font-bold text-sm rounded-2xl shadow-xl shadow-blue-900/30"
               >
-                <Shield className="w-4 h-4" /> Start Hosting Session
+                <Shield size={18} /> Establish Nexus Link
               </button>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="collab-link" className="ui-label">
-                  Shareable Link
+            <div className="flex flex-col gap-4 animate-in slide-in-from-bottom-2 duration-500">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="collab-link" className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">
+                  Shareable Gateway
                 </label>
-                <div className="flex gap-1">
+                <div className="flex gap-2 p-1.5 bg-white/40 rounded-2xl border border-white/60">
                   <input
                     id="collab-link"
                     type="text"
                     readOnly
                     value={collabUrl}
-                    className="retro-input flex-1 text-[10px] font-mono py-1"
+                    className="bg-transparent flex-1 text-[10px] font-mono px-3 py-2 outline-none text-zinc-600 truncate"
                   />
                   <button
                     type="button"
                     onClick={copyUrl}
-                    className="retro-button px-2"
+                    className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all active:scale-90 ${copyFeedback ? 'bg-green-500 text-white shadow-lg shadow-green-900/20' : 'bg-white border border-zinc-200 text-zinc-600 shadow-sm'}`}
                     title="Copy Link"
                   >
-                    {copyFeedback ? "OK!" : <Copy className="w-3 h-3" />}
+                    {copyFeedback ? <Check size={18} /> : <Copy size={16} />}
                   </button>
                 </div>
               </div>
 
-              <div className="p-2 border-2 border-dashed border-[var(--os-border-dark)] bg-blue-50/50 rounded flex items-start gap-2">
-                <Link className="w-4 h-4 mt-1 text-blue-600" />
-                <p className="text-[10px] text-blue-800 leading-tight">
-                  Send this link to a peer. Once they open it, they will join
-                  the real-time canvas session.
+              <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50 flex items-start gap-3">
+                <div className="bg-blue-100 p-1.5 rounded-lg mt-0.5">
+                  <Link size={14} className="text-blue-600" />
+                </div>
+                <p className="text-[10px] text-blue-800/80 font-medium leading-relaxed">
+                  Transmit this link to a peer. Once they sync with the gateway, they will materialize in your session.
                 </p>
               </div>
             </div>
           )}
+        </div>
 
-          <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-[var(--os-border-dark)]">
-            <button
-              type="button"
-              onClick={onClose}
-              className="retro-button min-w-[80px]"
-            >
-              Close
-            </button>
-          </div>
+        <div className="p-4 bg-[#F8FAFC] border-t border-white/20 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="genesis-button h-8 px-6 font-bold"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>

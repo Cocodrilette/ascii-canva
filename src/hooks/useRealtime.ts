@@ -128,20 +128,47 @@ export const useRealtime = (
     });
   }, [peerId]);
 
-  const addElementToDb = useCallback(async (element: Omit<BaseElement, 'id'>) => {
+  const addElementToDb = useCallback(async (element: any) => {
     if (!space?.id) return null;
     const { data: { user } } = await supabase.auth.getUser();
-    return await supabase.from("elements").insert({
-      ...element,
+    
+    // Extract extension params
+    const { id, type, x, y, z_index, ...params } = element;
+    
+    const payload: any = {
+      type,
+      x,
+      y,
+      z_index: z_index || 0,
+      params,
       space_id: space.id,
       created_by: user?.id
-    }).select().single();
+    };
+
+    if (id && id.length > 10) { // Assume it's a valid ID (UUID or similar)
+      payload.id = id;
+    }
+
+    return await supabase.from("elements").insert(payload).select().single();
   }, [space?.id]);
 
-  const updateElementInDb = useCallback(async (id: string, updates: Partial<BaseElement>) => {
+  const updateElementInDb = useCallback(async (id: string, element: any) => {
     if (!space?.id) return;
+    
+    // Extract extension params
+    const { id: _, type, x, y, z_index, space_id, created_at, updated_at, created_by, ...params } = element;
+    
+    const payload: any = {
+      type,
+      x,
+      y,
+      z_index: z_index || 0,
+      params,
+      updated_at: new Date().toISOString()
+    };
+
     return await supabase.from("elements")
-      .update(updates)
+      .update(payload)
       .eq("id", id);
   }, [space?.id]);
 

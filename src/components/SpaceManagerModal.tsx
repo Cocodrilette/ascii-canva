@@ -1,6 +1,7 @@
-import { X, Layout, Plus, ExternalLink, Copy, Check, Hash, Globe } from "lucide-react";
+import { X, Layout, Plus, ExternalLink, Copy, Check, Hash, Globe, ChevronRight } from "lucide-react";
 import type React from "react";
 import { useState, useEffect, useCallback } from "react";
+import { sileo } from "sileo";
 import { supabase } from "../lib/supabase";
 import AuthModal from "./AuthModal";
 
@@ -68,7 +69,7 @@ const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({ isOpen, onClose, 
     });
 
     if (error) {
-      alert(`Error creating space: ${error.message}`);
+      sileo.error({ title: "Sector Registration Failure", description: error.message });
     } else {
       setNewName("");
       setNewSlug("");
@@ -87,116 +88,144 @@ const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({ isOpen, onClose, 
 
   return (
     <>
-      <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/20">
-        <div className="window-raised w-full max-w-md shadow-[4px_4px_0_rgba(0,0,0,0.5)] m-4 flex flex-col max-h-[80vh]">
-          <div className="bg-[#000080] text-white px-2 py-1 flex items-center justify-between font-['VT323'] text-sm">
-            <div className="flex items-center gap-2">
-              <Layout size={14} />
-              <span>SPACE_EXPLORER.EXE</span>
+      <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="glass-floating w-full max-w-md shadow-2xl m-4 flex flex-col max-h-[85vh] overflow-hidden border-white/30 animate-in zoom-in-95 duration-300">
+          {/* Header */}
+          <div className="bg-[#000080]/10 px-4 py-4 flex items-center justify-between border-b border-white/20">
+            <div className="flex items-center gap-3 text-[#000080]">
+              <div className="bg-[#000080] p-1.5 rounded-lg text-white shadow-lg shadow-blue-900/20">
+                <Layout size={18} />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-sm tracking-tight">Space Explorer</span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">WORKSPACE_INDEX.V2</span>
+              </div>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="w-4 h-4 bg-[#C0C0C0] border-t-2 border-l-2 border-white border-r-2 border-b-2 border-[#808080] flex items-center justify-center text-black active:border-inset p-0"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-zinc-400 hover:text-red-500 transition-all"
             >
-              <X size={10} />
+              <X size={18} />
             </button>
           </div>
 
-          <div className="p-4 bg-[#C0C0C0] space-y-4 overflow-y-auto font-['MS_Sans_Serif']">
+          <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar bg-white/20">
             {!user ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
-                <Globe size={48} className="text-[#000080] opacity-50" />
-                <div className="space-y-1">
-                  <h3 className="font-bold text-sm uppercase">Cloud Storage Offline</h3>
-                  <p className="text-[10px] text-gray-600 max-w-[250px]">
-                    Login to initialize permanent spaces and manage your API integration targets.
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
+                <div className="bg-zinc-100 p-6 rounded-full relative shadow-inner">
+                  <Globe size={48} className="text-[#000080] opacity-30" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Plus size={24} className="text-[#000080]" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-bold text-lg text-zinc-800">Cloud Sync Required</h3>
+                  <p className="text-xs text-zinc-500 max-w-[280px] leading-relaxed">
+                    Initialize your operator profile to manage persistent canvas spaces and establish secure neural links.
                   </p>
                 </div>
                 <button 
                   onClick={() => setShowAuth(true)}
-                  className="retro-button px-6 py-2 font-bold flex items-center gap-2"
+                  className="genesis-button genesis-button-primary px-8 py-3 rounded-2xl shadow-xl shadow-blue-900/30 font-bold"
                 >
-                  <Plus size={14} /> Initialize User
+                  Sync Profile
                 </button>
               </div>
             ) : (
               <>
                 {/* Create New Space */}
-                <div className="window-sunken p-3 bg-white/50 space-y-3">
-                  <label className="text-[11px] font-bold block uppercase">Initialize New Space:</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="Space Name"
-                      className="window-sunken px-2 py-1 text-[11px] outline-none"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                    />
-                    <input
-                      type="text"
-                      placeholder="SLUG (e.g. ART-01)"
-                      className="window-sunken px-2 py-1 text-[11px] outline-none uppercase"
-                      value={newSlug}
-                      onChange={(e) => setNewSlug(e.target.value.toUpperCase())}
-                    />
+                <div className="p-4 rounded-2xl bg-white/40 border border-white/60 space-y-4 shadow-sm">
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Initialize Workspace</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        placeholder="Project Name"
+                        className="w-full bg-white/60 border border-white/60 rounded-xl px-3 py-2 text-xs font-medium outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        placeholder="SLUG-01"
+                        className="w-full bg-white/60 border border-white/60 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:ring-4 focus:ring-blue-500/5 transition-all uppercase"
+                        value={newSlug}
+                        onChange={(e) => setNewSlug(e.target.value.toUpperCase())}
+                      />
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={createSpace}
                     disabled={loading || !newName.trim() || !newSlug.trim()}
-                    className="retro-button w-full py-1 text-[11px] flex items-center justify-center gap-2"
+                    className="genesis-button genesis-button-primary w-full py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold text-xs"
                   >
-                    <Plus size={12} /> Register Space
+                    <Plus size={14} /> Register New Sector
                   </button>
                 </div>
 
                 {/* Space List */}
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold block uppercase">Your Registered Spaces:</label>
-                  <div className="window-sunken bg-white min-h-[150px] overflow-y-auto">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Registered Sectors</label>
+                  <div className="rounded-2xl border border-white/60 overflow-hidden bg-white/40 shadow-inner min-h-[200px]">
                     {spaces.length === 0 && !loading && (
-                      <div className="p-8 text-center text-gray-400 italic text-[10px]">No spaces initialized.</div>
-                    )}
-                    {spaces.map((space) => (
-                      <div key={space.id} className="border-b border-gray-100 p-2 hover:bg-blue-50 group">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-bold text-[11px] flex items-center gap-1">
-                              {space.name} 
-                              <span className="text-[9px] font-normal text-gray-500 bg-gray-100 px-1 border">
-                                {space.slug}
-                              </span>
-                            </div>
-                            <div className="text-[9px] text-gray-400 mt-1 font-mono flex items-center gap-1">
-                              <Hash size={8} /> ID: {space.id}
-                              <button 
-                                onClick={() => copyToClipboard(space.id, space.id)}
-                                className="opacity-0 group-hover:opacity-100 text-blue-600 hover:underline ml-1"
-                              >
-                                {copyId === space.id ? <Check size={8} /> : <Copy size={8} />}
-                              </button>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => onSwitchSpace(space.slug)}
-                            className="retro-button p-1"
-                            title="Open Space"
-                          >
-                            <ExternalLink size={12} />
-                          </button>
-                        </div>
+                      <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
+                        <Layout size={32} className="opacity-20 mb-2" />
+                        <p className="text-[11px] italic">No active sectors detected.</p>
                       </div>
-                    ))}
+                    )}
+                    <div className="divide-y divide-white/60">
+                      {spaces.map((space) => (
+                        <div key={space.id} className="p-4 hover:bg-white/40 transition-all group cursor-default">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs text-zinc-800">{space.name}</span>
+                                <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-tight">
+                                  {space.slug}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-[9px] text-zinc-400 font-mono flex items-center gap-1">
+                                  <Hash size={10} className="opacity-50" />
+                                  <span className="truncate max-w-[100px]">{space.id}</span>
+                                  <button 
+                                    onClick={() => copyToClipboard(space.id, space.id)}
+                                    className="ml-1 text-blue-400 hover:text-blue-600 transition-colors"
+                                  >
+                                    {copyId === space.id ? <Check size={10} /> : <Copy size={10} />}
+                                  </button>
+                                </div>
+                                <div className="w-1 h-1 bg-zinc-300 rounded-full" />
+                                <span className="text-[9px] text-zinc-400 font-medium">Created {new Date(space.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => onSwitchSpace(space.slug)}
+                              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-zinc-200 text-[#000080] shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all"
+                              title="Engage Space"
+                            >
+                              <ChevronRight size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </>
             )}
           </div>
 
-          <div className="p-2 border-t-2 border-[#808080] flex justify-between items-center text-[10px] font-bold uppercase text-gray-600 bg-[#C0C0C0]">
-             <span>Registered Spaces: {spaces.length}</span>
-             <button type="button" onClick={onClose} className="retro-button px-4">Close</button>
+          <div className="p-4 bg-[#F8FAFC] border-t border-white/20 flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-zinc-400">
+             <div className="flex items-center gap-2">
+               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+               <span>Sectors: {spaces.length}</span>
+             </div>
+             <button type="button" onClick={onClose} className="genesis-button h-8 px-6 font-bold">Close</button>
           </div>
         </div>
       </div>

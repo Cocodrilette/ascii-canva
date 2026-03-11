@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { sileo } from "sileo";
 import { X, Puzzle, Download, Plus, Check } from "lucide-react";
 import { useExtensions } from "../hooks/useExtensions";
 import { supabase } from "../lib/supabase";
@@ -21,11 +22,11 @@ export const ExtensionMarketplace: React.FC<MarketplaceProps> = ({ onClose }) =>
   const handlePublish = async () => {
     try {
       await publishExtension(newExt);
-      alert("Extension published successfully!");
+      sileo.success({ title: "Sequence Published", description: "Extension successfully indexed in the marketplace." });
       setView("browse");
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to publish extension");
+      sileo.error({ title: "Registry Failure", description: err.message || "Failed to publish extension" });
     }
   };
 

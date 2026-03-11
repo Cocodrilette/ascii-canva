@@ -12,10 +12,12 @@ import {
   Trash2,
   Users,
   Wifi,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { sileo } from "sileo";
 import type { BoxElement } from "../extensions/builtin/box";
 import type { LineElement } from "../extensions/builtin/line";
 import type { TextElement } from "../extensions/builtin/text";
@@ -45,6 +47,11 @@ const AsciiEditor: React.FC = () => {
   const { loading: extensionsLoading, autoInstallByTypes } = useExtensions();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [elements, setElements] = useState<BaseElement[]>([]);
+  const elementsRef = useRef<BaseElement[]>(elements);
+  
+  useEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
   
   // Auto-install missing extensions when elements update (especially on remote sync)
   useEffect(() => {
@@ -515,7 +522,7 @@ const AsciiEditor: React.FC = () => {
     return () => window.cancelAnimationFrame(animationFrameId);
   }, [draw]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback(async () => {
     if (isSelectingArea) {
       const x1 = Math.min(selectionStart.x, selectionEnd.x);
       const y1 = Math.min(selectionStart.y, selectionEnd.y);
@@ -525,7 +532,7 @@ const AsciiEditor: React.FC = () => {
       const canvas = canvasRef.current;
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
-        const newlySelected = elements.filter(el => {
+        const newlySelected = elementsRef.current.filter(el => {
           if (!hasExtension(el.type)) return false;
           const b = getExtension(el.type).getBounds(el);
           const screenL = b.left * visualCellSize + viewOffset.x + rect.left;
@@ -540,13 +547,23 @@ const AsciiEditor: React.FC = () => {
       }
     }
 
+    if (hasDragged.current && space?.id) {
+      const movedIds = [...selectedIds, ...capturedIds];
+      const updates = movedIds.map(id => {
+        const el = elementsRef.current.find(e => e.id === id);
+        if (el) return updateElementInDb(id, el);
+        return Promise.resolve();
+      });
+      await Promise.all(updates);
+    }
+
     setIsDragging(false);
     setIsResizing(false);
     setDraggedPointIndex(null);
     setIsPanning(false);
     setIsSelectingArea(false);
     setCapturedIds([]);
-  }, [isSelectingArea, selectionStart, selectionEnd, elements, visualCellSize, viewOffset]);
+  }, [isSelectingArea, selectionStart, selectionEnd, visualCellSize, viewOffset, space?.id, updateElementInDb, selectedIds, capturedIds]);
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
@@ -1318,9 +1335,12 @@ const AsciiEditor: React.FC = () => {
     }
   };
 
-  const addExtensionElement = (type: string) => {
+  const addExtensionElement = async (type: string) => {
     if (elements.length >= 100) {
-      alert("System Limit: Maximum 100 elements reached.");
+      sileo.error({
+        title: "System Capacity Reached",
+        description: "Maximum 100 neural objects allowed per sector."
+      });
       return;
     }
     pushToHistory();
@@ -1330,20 +1350,48 @@ const AsciiEditor: React.FC = () => {
       Math.floor((window.innerHeight / 2 - viewOffset.y) / visualCellSize),
       type === "text" ? { text: newText.trim() || "NEW TEXT" } : {},
     );
-    setElements([...elements, newEl]);
+
+    // Persistence: Add to DB if in a space
+    if (space?.id) {
+      const { data, error } = await addElementToDb(newEl);
+      if (error) {
+        sileo.error({ title: "Registration Failure", description: error.message });
+      } else if (data) {
+        // useRealtime will trigger onElementCreated, which adds it to local state.
+        // We don't necessarily need to add it here, but for "optimistic" UI we could.
+        // However, to avoid duplicates, let's just wait for the realtime event or add it if not already there.
+        const inflated = inflateElement(data);
+        setElements(prev => {
+          if (prev.find(e => e.id === inflated.id)) return prev;
+          return [...prev, inflated];
+        });
+        setSelectedIds([inflated.id]);
+      }
+    } else {
+      setElements([...elements, newEl]);
+      setSelectedIds([newEl.id]);
+    }
+    
     setNewText("");
-    setSelectedIds([newEl.id]);
   };
 
   const saveProject = () => {
-    const data = JSON.stringify(elements, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "canvas_project.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const data = JSON.stringify(elements, null, 2);
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "canvas_project.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      sileo.success({
+        title: "Sequence Archived",
+        description: "Project manifest successfully exported to local storage."
+      });
+    } catch (err) {
+      sileo.error({ title: "Archival Failure", description: "Failed to serialize current canvas state." });
+    }
   };
 
   const loadProject = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1355,8 +1403,12 @@ const AsciiEditor: React.FC = () => {
         const loadedElements = JSON.parse(event.target?.result as string);
         pushToHistory();
         setElements(loadedElements);
+        sileo.info({
+          title: "Sequence Restored",
+          description: `Successfully materialized ${loadedElements.length} objects.`
+        });
       } catch (_err) {
-        alert("Error: Invalid project file.");
+        sileo.error({ title: "Materialization Error", description: "Invalid project manifest detected." });
       }
     };
     reader.readAsText(file);
@@ -1429,14 +1481,21 @@ const AsciiEditor: React.FC = () => {
   };
 
   const deleteSelected = useCallback(
-    (id?: string) => {
+    async (id?: string) => {
       const targets = id ? [id] : selectedIds;
       if (targets.length === 0) return;
       pushToHistory();
       setElements((prev) => prev.filter((el) => !targets.includes(el.id)));
       setSelectedIds(prev => prev.filter(id => !targets.includes(id)));
+
+      // Persistence: Delete from DB if in a space
+      if (space?.id) {
+        for (const targetId of targets) {
+          await deleteElementFromDb(targetId);
+        }
+      }
     },
-    [selectedIds, pushToHistory],
+    [selectedIds, pushToHistory, space?.id, deleteElementFromDb],
   );
   const generateAscii = () => {
     if (elements.length === 0) return;
@@ -1525,7 +1584,12 @@ const AsciiEditor: React.FC = () => {
           }}
           value={(selectedElement as TextElement).text}
           onChange={(e) => updateSelectedText(e.target.value)}
-          onBlur={() => setIsEditing(false)}
+          onBlur={() => {
+            setIsEditing(false);
+            if (space?.id && selectedElement) {
+              updateElementInDb(selectedElement.id, selectedElement);
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               setIsEditing(false);
@@ -1534,100 +1598,54 @@ const AsciiEditor: React.FC = () => {
         />
       )}
 
-      {/* Main UI Header */}
-      <div className="fixed top-0 left-0 right-0 bg-(--os-bg) border-b-2 border-(--os-border-dark) z-50 flex flex-col shadow-sm">
-        <div className="flex items-center justify-between px-2 py-1 bg-[var(--os-titlebar)] text-white font-mono text-[11px] uppercase tracking-wider">
-          <div className="flex items-center gap-2 font-['VT323'] text-sm">
-            <Terminal size={14} />
-            <span className="font-bold">ascii_canva_v{process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0"}.exe</span>
-          </div>
-          <div className="flex items-center gap-4 text-[10px] font-sans uppercase font-bold">
-            {status === "connected" && (
-              <span className="text-green-400 flex items-center gap-1">
-                <Wifi size={10} className="animate-pulse" /> SYNCED: {channelId}
-              </span>
-            )}
-            <div className="flex gap-1">
-              <button
-                type="button"
-                className="w-4 h-4 bg-(--os-bg) border-t border-l border-[var(--os-border-light)] border-r border-b border-(--os-border-dark) text-black flex items-center justify-center text-[10px]"
-              >
-                _
-              </button>
-              <button
-                type="button"
-                className="w-4 h-4 bg-(--os-bg) border-t border-l border-[var(--os-border-light)] border-r border-b border-(--os-border-dark) text-black flex items-center justify-center text-[10px]"
-              >
-                □
-              </button>
-              <button
-                type="button"
-                onClick={() => (window.location.href = "/")}
-                className="w-4 h-4 bg-(--os-bg) border-t border-l border-[var(--os-border-light)] border-r border-b border-(--os-border-dark) text-black hover:bg-red-500 hover:text-white flex items-center justify-center text-[10px]"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between px-2 py-1.5 gap-4 bg-(--os-bg)">
-          <div className="flex items-center gap-1">
-            {/* File Group */}
-            <div className="flex gap-1 border-r border-gray-400 pr-2 mr-2">
-              <button
-                type="button"
-                onClick={saveProject}
-                className="retro-button px-2 py-1 text-[10px]"
-              >
-                Save
-              </button>
-              <label className="retro-button px-2 py-1 text-[10px] cursor-default">
-                Open
-                <input
-                  type="file"
-                  onChange={loadProject}
-                  className="hidden"
-                  accept=".json"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={generateAscii}
-                className="retro-button px-3 py-1 text-[10px] font-bold text-[var(--os-titlebar)] border-blue-600"
-              >
-                Export ASCII
-              </button>
-              <button
-                type="button"
-                onClick={exportToImage}
-                className="retro-button px-3 py-1 text-[10px] font-bold text-green-700 border-green-700"
-              >
-                Export IMG
-              </button>
+      {/* Main UI Header - Glass Redesign */}
+      <div className="fixed top-4 left-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+        <div className="glass-surface rounded-2xl p-2 flex items-center justify-between shadow-2xl pointer-events-auto border-white/20">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1 bg-[#000080]/10 rounded-xl text-[#000080]">
+              <Terminal size={16} />
+              <span className="font-bold text-xs tracking-tight">ascii_canva.genesis</span>
             </div>
 
-            {/* Tools Group */}
-            <div className="flex gap-1 items-center">
-              {getAllExtensions().map((ext) => (
+            <div className="h-6 w-px bg-zinc-300/50" />
+
+            <div className="flex items-center gap-1">
+              {/* File Actions */}
+              <div className="flex gap-1 bg-white/40 p-1 rounded-xl border border-white/40">
                 <button
-                  key={ext.type}
                   type="button"
-                  onClick={() => addExtensionElement(ext.type)}
-                  className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px]"
-                  title={`Add ${ext.label}`}
+                  onClick={saveProject}
+                  className="genesis-button h-8 px-3 text-[11px]"
                 >
-                  <ext.icon size={12} /> {ext.label}
+                  Save
                 </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setShowMarketplace(true)}
-                className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] bg-yellow-50 border-yellow-600"
-                title="Open Extension Marketplace"
-              >
-                <Puzzle size={12} /> Marketplace
-              </button>
+                <label className="genesis-button h-8 px-3 text-[11px] cursor-pointer">
+                  Open
+                  <input type="file" onChange={loadProject} className="hidden" accept=".json" />
+                </label>
+                <button
+                  type="button"
+                  onClick={generateAscii}
+                  className="genesis-button genesis-button-primary h-8 px-4 text-[11px]"
+                >
+                  Export ASCII
+                </button>
+              </div>
+
+              {/* Tools */}
+              <div className="flex gap-1 ml-2">
+                {getAllExtensions().map((ext) => (
+                  <button
+                    key={ext.type}
+                    type="button"
+                    onClick={() => addExtensionElement(ext.type)}
+                    className="genesis-button h-8 px-3"
+                    title={`Add ${ext.label}`}
+                  >
+                    <ext.icon size={14} />
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -1635,63 +1653,41 @@ const AsciiEditor: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowAiChat(!showAiChat)}
-              className={`retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] ${showAiChat ? "bg-green-100 border-green-600" : "bg-green-50/50"}`}
-              title="Open AI Drawing Assistant"
+              className={`genesis-button h-8 px-3 ${showAiChat ? "bg-green-100 border-green-200 text-green-700" : ""}`}
             >
-              <Bot size={12} /> AI Chat
+              <Bot size={14} /> <span className="text-[11px] font-bold">AI</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setShowExplorer(!showExplorer)}
-              className={`retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] ${showExplorer ? "bg-blue-100 border-blue-600" : ""}`}
-            >
-              <Layers size={12} /> Layers
+            
+            <div className="h-6 w-px bg-zinc-300/50 mx-1" />
+
+            <button onClick={() => setShowExplorer(!showExplorer)} className="genesis-button h-8 px-3">
+              <Layers size={14} />
             </button>
-            <button
-              type="button"
-              onClick={() => setShowSpacesModal(true)}
-              className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px]"
-              title="Manage Spaces"
-            >
-              <Layers size={12} /> Spaces
+            <button onClick={() => setShowSpacesModal(true)} className="genesis-button h-8 px-3">
+              <Users size={14} />
             </button>
-            <button
-              type="button"
-              onClick={() => setShowApiKeyModal(true)}
-              className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px]"
-              title="Manage API Keys"
-            >
-              <Key size={12} /> API Keys
+            <button onClick={() => setShowApiKeyModal(true)} className="genesis-button h-8 px-3">
+              <Key size={14} />
             </button>
-            <button
-              type="button"
-              onClick={() => setShowCollab(true)}
-              className={`retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] ${status === "connected" ? "text-green-600 font-bold" : ""}`}
-            >
-              <Users size={12} /> Collaborate
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowTutorial(true)}
-              className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px]"
-            >
-              <Book size={12} /> Tutorial
-            </button>
-            <Link
-              href="/docs"
-              className="retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] no-underline"
-            >
-              <Book size={12} /> Help
-            </Link>
+            
+            <div className="flex gap-1 ml-2">
+              <button
+                type="button"
+                onClick={() => (window.location.href = "/")}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-red-50 text-red-600 hover:bg-red-500 hover:text-white transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Contextual Property Bar */}
         {selectedIds.length > 0 && (
-          <div className="flex items-center px-4 py-1.5 bg-white/40 border-t border-gray-300 gap-6 text-[9px] uppercase font-bold text-gray-700 animate-in slide-in-from-top duration-200">
+          <div className="glass-surface self-center rounded-xl px-4 py-2 flex items-center gap-6 shadow-xl border-white/20 animate-in slide-in-from-top-4 pointer-events-auto">
             <div className="flex items-center gap-2">
-              <span className="opacity-40">Selection:</span>
-              <span className="bg-white px-1 border border-gray-300">
+              <span className="text-[10px] font-bold uppercase text-zinc-400">Selection:</span>
+              <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-blue-100">
                 {selectedIds.length} object(s)
               </span>
             </div>
@@ -1700,17 +1696,17 @@ const AsciiEditor: React.FC = () => {
                 <button
                   type="button"
                   onClick={setCenter}
-                  className={`flex items-center gap-1 hover:text-[var(--os-titlebar)] ${elements.find((e) => e.id === selectedIds[0])?.isCenter ? "text-blue-600" : ""}`}
+                  className={`flex items-center gap-1 text-[10px] font-bold hover:text-[#000080] transition-colors ${elements.find((e) => e.id === selectedIds[0])?.isCenter ? "text-blue-600" : "text-zinc-500"}`}
                 >
-                  <GripHorizontal size={12} /> Set View Center
+                  <GripHorizontal size={14} /> Center
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => deleteSelected()}
-                className="flex items-center gap-1 hover:text-red-600"
+                className="flex items-center gap-1 text-[10px] font-bold text-red-400 hover:text-red-600 transition-colors"
               >
-                <Trash2 size={12} /> Delete Selection
+                <Trash2 size={14} /> Delete
               </button>
             </div>
           </div>
