@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { id: spaceIdOrSlug } = req.query;
+  const { id: spaceId } = req.query;
 
   const apiKey = req.headers["x-api-key"] as string;
 
@@ -35,14 +35,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: "API Key revoked" });
     }
 
+    console.log("API Key valid for user:", keyData.user_id);
+
+
     // 2. Resolve Space
+    // First, try to find by ID (UUID) or by Slug
     const { data: spaceData, error: spaceError } = await supabase
       .from("spaces")
-      .select("id, owner_id")
-      .or(`owner_id.eq.${keyData.user_id},slug.eq.${spaceIdOrSlug}`)
-      .single();
+      .select("id, owner_id").eq("id", spaceId)
+      .maybeSingle();
 
     if (spaceError || !spaceData) {
+      console.log("Space lookup failed for ID/Slug:", spaceId, spaceError);
       return res.status(404).json({ error: "Space not found" });
     }
 

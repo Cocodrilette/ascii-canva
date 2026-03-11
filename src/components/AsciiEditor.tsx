@@ -1,5 +1,6 @@
 import {
   Book,
+  Bot,
   Copy,
   Download,
   FileText,
@@ -27,6 +28,7 @@ import { useExtensions } from "../hooks/useExtensions";
 import { useRealtime } from "../hooks/useRealtime";
 import { isInside } from "../utils/geometry";
 // Removed packElements and unpackElements imports as we use JSON now
+import AiChat from "./AiChat";
 import ApiKeyModal from "./ApiKeyModal";
 import CollabModal from "./CollabModal";
 import { ExtensionMarketplace } from "./ExtensionMarketplace";
@@ -80,6 +82,25 @@ const AsciiEditor: React.FC = () => {
   const [showExplorer, setShowExplorer] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [showSpacesModal, setShowSpacesModal] = useState(false);
+  const [showAiChat, setShowAiChat] = useState(false);
+  const [activeApiKey, setActiveApiKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Attempt to get an active API key for the current user
+    const fetchActiveKey = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("api_keys")
+        .select("key")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+      if (data) setActiveApiKey(data.key);
+    };
+    fetchActiveKey();
+  }, [showAiChat]); // Refresh when opening chat
 
   useEffect(() => {
     const hasSeenTutorial = localStorage.getItem("ascii-seen-tutorial");
@@ -241,18 +262,29 @@ const AsciiEditor: React.FC = () => {
     [centerView],
   );
 
-  const onElementCreated = useCallback((el: any) => {
+  const inflateElement = useCallback((el: any) => {
     const flattened = { ...el, ...el.params };
-    setElements(prev => {
-      if (prev.find(e => e.id === flattened.id)) return prev;
-      return [...prev, flattened];
-    });
+    if ((flattened.type === "vector" || flattened.type === "line") && !flattened.points) {
+      flattened.points = [
+        { x: flattened.x, y: flattened.y },
+        { x: flattened.x2 ?? flattened.x + 5, y: flattened.y2 ?? flattened.y + 3 }
+      ];
+    }
+    return flattened as BaseElement;
   }, []);
 
+  const onElementCreated = useCallback((el: any) => {
+    const inflated = inflateElement(el);
+    setElements(prev => {
+      if (prev.find(e => e.id === inflated.id)) return prev;
+      return [...prev, inflated];
+    });
+  }, [inflateElement]);
+
   const onElementUpdated = useCallback((el: any) => {
-    const flattened = { ...el, ...el.params };
-    setElements(prev => prev.map(e => e.id === flattened.id ? flattened : e));
-  }, []);
+    const inflated = inflateElement(el);
+    setElements(prev => prev.map(e => e.id === inflated.id ? inflated : e));
+  }, [inflateElement]);
 
   const onElementDeleted = useCallback((id: string) => {
     setElements(prev => prev.filter(e => e.id !== id));
@@ -286,13 +318,13 @@ const AsciiEditor: React.FC = () => {
           .eq("space_id", space.id);
         
         if (!error && data) {
-          const flattened = data.map((el: any) => ({ ...el, ...el.params }));
-          setElements(flattened as BaseElement[]);
+          const inflated = data.map((el: any) => inflateElement(el));
+          setElements(inflated);
         }
       };
       fetchElements();
     }
-  }, [space?.id]);
+  }, [space?.id, inflateElement]);
 
   const setCenter = useCallback(() => {
     if (selectedIds.length !== 1) return;
@@ -741,7 +773,7 @@ const AsciiEditor: React.FC = () => {
         );
       } else if (isDragging && selectedIds.length > 0) {
         const dx = gridX - dragOffset.current.x;
-        const dy = gridY - dragOffset.current.y;
+        const dy = gridY - gridY - dragOffset.current.y;
         if (dx !== 0 || dy !== 0) {
           hasDragged.current = true;
           const movedIds = [...selectedIds, ...capturedIds];
@@ -1602,6 +1634,14 @@ const AsciiEditor: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => setShowAiChat(!showAiChat)}
+              className={`retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] ${showAiChat ? "bg-green-100 border-green-600" : "bg-green-50/50"}`}
+              title="Open AI Drawing Assistant"
+            >
+              <Bot size={12} /> AI Chat
+            </button>
+            <button
+              type="button"
               onClick={() => setShowExplorer(!showExplorer)}
               className={`retro-button flex items-center gap-1.5 px-2 py-1 text-[10px] ${showExplorer ? "bg-blue-100 border-blue-600" : ""}`}
             >
@@ -1801,6 +1841,17 @@ const AsciiEditor: React.FC = () => {
         selectedIds={selectedIds}
         setSelectedIds={setSelectedIds}
         onDeleteElement={deleteSelected}
+      />
+
+      <AiChat 
+        isOpen={showAiChat} 
+        onClose={() => setShowAiChat(false)}
+        spaceId={space?.id || ""}
+        apiKey={activeApiKey}
+        elements={elements}
+        onNewElement={(el) => {
+          // Handled by realtime subscriptions
+        }}
       />
 
       <Taskbar />

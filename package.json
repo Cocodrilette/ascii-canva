@@ -14,6 +14,7 @@
     "mcp": "tsx mcp/server.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.99.0",
     "@types/react-syntax-highlighter": "^15.5.13",
     "dotenv": "^17.3.1",

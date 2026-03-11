@@ -7,7 +7,7 @@ interface CollabModalProps {
   onClose: () => void;
   peerId: string;
   channelId: string;
-  status: "idle" | "connecting" | "connected" | "failed";
+  status: "idle" | "connecting" | "connected" | "failed" | "loading";
   onStartHost: () => void;
 }
 
@@ -65,6 +65,7 @@ const CollabModal: React.FC<CollabModalProps> = ({
     connecting: "text-yellow-600 animate-pulse",
     connected: "text-green-600 font-bold",
     failed: "text-red-600",
+    loading: "text-blue-600",
   };
 
   return (

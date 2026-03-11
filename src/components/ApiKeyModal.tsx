@@ -26,6 +26,13 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setGeminiApiKey(localStorage.getItem("GEMINI_API_KEY") || "");
+    }
+  }, [isOpen]);
 
   const checkUser = useCallback(async () => {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -196,8 +203,8 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => {
                 {/* Key List */}
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold block uppercase">Active & Revoked Keys:</label>
-                  <div className="window-sunken bg-white min-h-[150px] overflow-y-auto">
-                    <table className="w-full text-[10px] border-collapse">
+                  <div className="window-sunken bg-white min-h-[150px] overflow-y-auto text-[10px]">
+                    <table className="w-full border-collapse">
                       <thead className="bg-gray-100 border-b border-gray-300 sticky top-0">
                         <tr className="text-left uppercase">
                           <th className="px-2 py-1 border-r border-gray-300">Name</th>
@@ -240,6 +247,31 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+
+                {/* External AI Integration */}
+                <div className="pt-4 border-t-2 border-[#808080] space-y-2">
+                  <div className="flex items-center gap-2 text-[#000080]">
+                    <RefreshCw size={14} />
+                    <label className="text-[11px] font-bold block uppercase">External AI Integration</label>
+                  </div>
+                  <p className="text-[9px] text-gray-600 leading-tight">
+                    Provide your own Google Gemini API key to enable AI-powered diagram generation. 
+                    This key is stored <span className="font-bold underline">locally in your browser</span> and never sent to our database.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="Enter Gemini API Key (AI_...) "
+                      className="window-sunken flex-1 px-2 py-1 text-[11px] outline-none"
+                      value={geminiApiKey}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setGeminiApiKey(val);
+                        localStorage.setItem("GEMINI_API_KEY", val);
+                      }}
+                    />
                   </div>
                 </div>
               </>
