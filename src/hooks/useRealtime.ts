@@ -85,7 +85,11 @@ export const useRealtime = (
     // A. Listen to Broadcast (Offline/Ephemeral Fallback)
     channel.on("broadcast", { event: "sync" }, ({ payload }) => {
       if (payload.sender_id === peerId) return;
-      onRemoteSync?.(payload.elements);
+      // ONLY apply broadcast sync if we are NOT in a persistent space
+      // to avoid conflicts with granular DB updates
+      if (!space?.id) {
+        onRemoteSync?.(payload.elements);
+      }
     });
 
     // B. Listen to Postgres Changes (If Space exists)
@@ -121,12 +125,15 @@ export const useRealtime = (
   // Sync Helpers
   const sendBroadcastSync = useCallback((elements: BaseElement[]) => {
     if (!channelRef.current) return;
+    // Don't broadcast full state if we are in a persistent space
+    if (space?.id) return;
+
     channelRef.current.send({
       type: "broadcast",
       event: "sync",
       payload: { sender_id: peerId, elements },
     });
-  }, [peerId]);
+  }, [peerId, space?.id]);
 
   const addElementToDb = useCallback(async (element: any) => {
     if (!space?.id) return null;

@@ -246,6 +246,10 @@ const AsciiEditor: React.FC = () => {
 
   const onRemoteData = useCallback(
     (remoteElements: BaseElement[]) => {
+      // If we are in a persistent space, we only trust granular Postgres changes.
+      // Broadcast is only for ephemeral/local collaboration.
+      if (space?.id) return;
+
       isRemoteUpdate.current = true;
 
       setElements((prev) => {
@@ -328,6 +332,7 @@ const AsciiEditor: React.FC = () => {
           const inflated = data.map((el: any) => inflateElement(el));
           setElements(inflated);
         }
+        setIsLoaded(true); // Signal that initial DB fetch is complete
       };
       fetchElements();
     }
@@ -346,12 +351,12 @@ const AsciiEditor: React.FC = () => {
     });
   }, [selectedIds, pushToHistory, centerView]);
 
-  // Sync elements to peers (Bi-directional)
+  // Sync elements to peers (Bi-directional - only for ephemeral broadcast mode)
   useEffect(() => {
-    if (status === "connected" && !isRemoteUpdate.current) {
+    if (isLoaded && !space?.id && status === "connected" && !isRemoteUpdate.current) {
       sendData(elements);
     }
-  }, [elements, status, sendData]);
+  }, [elements, status, sendData, isLoaded, space?.id]);
 
   // Handle state request from new joiners
   useEffect(() => {
@@ -401,32 +406,41 @@ const AsciiEditor: React.FC = () => {
     }
   }, [isLoaded, centerView]); // Center only once when initially loaded
 
-  // Persistence
+  // 1. Initial State Loading Logic (Pure Local Mode fallback)
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const isJoining = urlParams.has("join");
+    const initLoad = async () => {
+      // If we are joining a space or in a registered space, skip local loading (handled by DB effect)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has("join") || space?.id) return;
 
-    if (!isJoining) {
-      const saved = localStorage.getItem("ascii-canvas-state");
-      if (saved) {
-        try {
-          setElements(JSON.parse(saved));
-        } catch (_e) {
-          console.error("Failed to restore state");
+      if (!isLoaded) {
+        const saved = localStorage.getItem("ascii-canvas-state");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (parsed && parsed.length > 0) {
+              setElements(parsed);
+            } else {
+              setElements(getWelcomeElements());
+            }
+          } catch (e) {
+            setElements(getWelcomeElements());
+          }
+        } else {
           setElements(getWelcomeElements());
         }
-      } else {
-        setElements(getWelcomeElements());
+        setIsLoaded(true);
       }
-    }
-    setIsLoaded(true);
-  }, [getWelcomeElements]);
+    };
+    initLoad();
+  }, [getWelcomeElements, isLoaded, space?.id]);
 
+  // 2. Persist to LocalStorage ONLY in local mode
   useEffect(() => {
-    if (isLoaded) {
+    if (isLoaded && !space?.id) {
       localStorage.setItem("ascii-canvas-state", JSON.stringify(elements));
     }
-  }, [elements, isLoaded]);
+  }, [elements, isLoaded, space?.id]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -1368,7 +1382,7 @@ const AsciiEditor: React.FC = () => {
         setSelectedIds([inflated.id]);
       }
     } else {
-      setElements([...elements, newEl]);
+      setElements(prev => [...prev, newEl]);
       setSelectedIds([newEl.id]);
     }
     
