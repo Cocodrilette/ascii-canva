@@ -1367,19 +1367,22 @@ const AsciiEditor: React.FC = () => {
 
     // Persistence: Add to DB if in a space
     if (space?.id) {
-      const { data, error } = await addElementToDb(newEl);
-      if (error) {
-        sileo.error({ title: "Registration Failure", description: error.message });
-      } else if (data) {
-        // useRealtime will trigger onElementCreated, which adds it to local state.
-        // We don't necessarily need to add it here, but for "optimistic" UI we could.
-        // However, to avoid duplicates, let's just wait for the realtime event or add it if not already there.
-        const inflated = inflateElement(data);
-        setElements(prev => {
-          if (prev.find(e => e.id === inflated.id)) return prev;
-          return [...prev, inflated];
-        });
-        setSelectedIds([inflated.id]);
+      const res = await addElementToDb(newEl);
+      if (res) {
+        const { data, error } = res;
+        if (error) {
+          sileo.error({ title: "Registration Failure", description: error.message });
+        } else if (data) {
+          // useRealtime will trigger onElementCreated, which adds it to local state.
+          // We don't necessarily need to add it here, but for "optimistic" UI we could.
+          // However, to avoid duplicates, let's just wait for the realtime event or add it if not already there.
+          const inflated = inflateElement(data);
+          setElements(prev => {
+            if (prev.find(e => e.id === inflated.id)) return prev;
+            return [...prev, inflated];
+          });
+          setSelectedIds([inflated.id]);
+        }
       }
     } else {
       setElements(prev => [...prev, newEl]);
