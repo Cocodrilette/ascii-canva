@@ -1,97 +1,121 @@
 import Head from "next/head";
 import Link from "next/link";
-import { Terminal, Users, Layers, Zap } from "lucide-react";
+import { Terminal, Users, Layers, Zap, ArrowRight, Github, Sparkles } from "lucide-react";
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-(--os-bg) flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#f1f5f9] flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden">
       <Head>
-        <title>ascii_canva | Retro ASCII Canvas</title>
+        <title>ascii_canva | Collaborative ASCII Canvas</title>
         <meta name="description" content="A collaborative ASCII editor built for the retro future." />
       </Head>
 
-      <div className="w-full max-w-3xl border-t-2 border-l-2 border-(--os-border-light) border-r-2 border-b-2 border-(--os-border-dark) bg-(--os-bg) shadow-[4px_4px_0px_0px_rgba(0,0,0,0.5)]">
-        {/* Title Bar */}
-        <div className="bg-[var(--os-titlebar)] text-[var(--os-titlebar-text)] px-2 py-1 flex items-center justify-between font-['VT323'] text-sm">
-          <div className="flex items-center gap-2">
-            <Terminal size={14} />
-            <span>ascii_canva_v{process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0"}.exe</span>
-          </div>
-          <div className="flex gap-1">
-            <button className="w-4 h-4 bg-(--os-bg) border-t border-l border-(--os-border-light) border-r border-b border-(--os-border-dark) text-black flex items-center justify-center text-[10px]">_</button>
-            <button className="w-4 h-4 bg-(--os-bg) border-t border-l border-(--os-border-light) border-r border-b border-(--os-border-dark) text-black flex items-center justify-center text-[10px]">□</button>
-            <button className="w-4 h-4 bg-(--os-bg) border-t border-l border-(--os-border-light) border-r border-b border-(--os-border-dark) text-black flex items-center justify-center text-[10px]">✕</button>
-          </div>
-        </div>
+      {/* Background Decorative Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full" />
 
-        {/* Content Area */}
-        <div className="p-8 font-['MS_Sans_Serif'] text-[11px] leading-relaxed">
-          <div className="mb-8 text-center">
-            <h1 className="text-4xl font-['VT323'] mb-2 tracking-tighter uppercase">ascii_canva</h1>
-            <p className="text-[var(--os-titlebar)] font-bold italic">Simple Retro ASCII Workspace</p>
-          </div>
+      <main className="w-full max-w-5xl z-10 space-y-16">
+        {/* Header Section */}
+        <div className="flex flex-col items-center text-center space-y-8">
+          <h1 className="text-7xl md:text-9xl font-bold tracking-tight text-zinc-900">
+            ascii_canva
+          </h1>
+          
+          <p className="max-w-xl text-xl text-zinc-500 font-medium leading-relaxed">
+            A collaborative canvas for character-based art. 
+            Build, share, and evolve grids with precision.
+          </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-            {/* Feature 1 */}
-            <div className="p-4 border-t-2 border-l-2 border-(--os-border-dark) border-r-2 border-b-2 border-(--os-border-light) bg-white">
-              <div className="flex items-center gap-3 mb-2">
-                <Terminal className="text-[var(--os-titlebar)]" size={20} />
-                <h3 className="font-bold uppercase">ASCII Canvas</h3>
-              </div>
-              <p>Manipulate 8x8 character grids with surgical precision. Traditional glyphs meet modern logic.</p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="p-4 border-t-2 border-l-2 border-(--os-border-dark) border-r-2 border-b-2 border-(--os-border-light) bg-white">
-              <div className="flex items-center gap-3 mb-2">
-                <Users className="text-[var(--os-titlebar)]" size={20} />
-                <h3 className="font-bold uppercase">Realtime Sync</h3>
-              </div>
-              <p>Powered by Supabase. Collaborate with your team in the terminal space with zero latency.</p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="p-4 border-t-2 border-l-2 border-(--os-border-dark) border-r-2 border-b-2 border-(--os-border-light) bg-white">
-              <div className="flex items-center gap-3 mb-2">
-                <Layers className="text-[var(--os-titlebar)]" size={20} />
-                <h3 className="font-bold uppercase">Extensible Tools</h3>
-              </div>
-              <p>Built-in support for Box, Text, and Vector extensions. Modular architecture for the future.</p>
-            </div>
-
-            {/* Feature 4 */}
-            <div className="p-4 border-t-2 border-l-2 border-(--os-border-dark) border-r-2 border-b-2 border-(--os-border-light) bg-white">
-              <div className="flex items-center gap-3 mb-2">
-                <Zap className="text-[var(--os-titlebar)]" size={20} />
-                <h3 className="font-bold uppercase">Retro UX</h3>
-                </div>
-              <p>Authentic Win95/MacOS 8 aesthetic. Low-overhead, high-impact visual performance.</p>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-6 pt-4">
             <Link 
               href="/space" 
-              className="px-8 py-3 bg-(--os-bg) border-t-2 border-l-2 border-(--os-border-light) border-r-2 border-b-2 border-(--os-border-dark) hover:bg-gray-100 active:border-t-2 active:border-l-2 active:border-(--os-border-dark) active:border-r-2 active:border-b-2 active:border-(--os-border-light) font-['VT323'] text-xl uppercase tracking-widest flex items-center gap-2"
+              className="genesis-button genesis-button-primary px-10 py-4 rounded-full text-lg font-semibold shadow-2xl shadow-blue-500/20 group"
             >
-              Initialize Workspace
+              Get Started
+              <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
             </Link>
-            <div className="flex items-center gap-2 text-gray-600">
-              <span className="w-2 h-2 bg-[var(--os-green)] animate-pulse rounded-full"></span>
-              <span>System Ready. v{process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0"}</span>
-            </div>
+            
+            <Link 
+              href="/docs" 
+              className="genesis-button px-10 py-4 rounded-full text-lg font-semibold border-zinc-200"
+            >
+              Learn more
+            </Link>
           </div>
         </div>
 
-        {/* Status Bar */}
-        <div className="border-t-2 border-(--os-border-dark) p-1 px-2 flex justify-between text-[10px] uppercase font-bold text-gray-700 bg-(--os-bg)">
-          <span>4 OBJECT(S) LOADED</span>
-          <div className="flex gap-4">
-            <span>DISK: OK</span>
-            <span>MEMORY: 640KB</span>
+        {/* Feature Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {/* Feature 1 */}
+          <div className="p-2 group cursor-default">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-50 flex items-center justify-center mb-6 group-hover:bg-zinc-100 transition-colors">
+              <Terminal className="text-zinc-900" size={24} />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 text-zinc-900">Precision</h3>
+            <p className="text-sm text-zinc-500 leading-relaxed">
+              Manipulate character grids with surgical detail.
+            </p>
+          </div>
+
+          {/* Feature 2 */}
+          <div className="p-2 group cursor-default">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-50 flex items-center justify-center mb-6 group-hover:bg-zinc-100 transition-colors">
+              <Users className="text-zinc-900" size={24} />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 text-zinc-900">Collaboration</h3>
+            <p className="text-sm text-zinc-500 leading-relaxed">
+              Real-time synchronization for seamless teamwork.
+            </p>
+          </div>
+
+          {/* Feature 3 */}
+          <div className="p-2 group cursor-default">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-50 flex items-center justify-center mb-6 group-hover:bg-zinc-100 transition-colors">
+              <Layers className="text-zinc-900" size={24} />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 text-zinc-900">Extensions</h3>
+            <p className="text-sm text-zinc-500 leading-relaxed">
+              Modular architecture built for flexibility.
+            </p>
+          </div>
+
+          {/* Feature 4 */}
+          <div className="p-2 group cursor-default">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-50 flex items-center justify-center mb-6 group-hover:bg-zinc-100 transition-colors">
+              <Zap className="text-zinc-900" size={24} />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 text-zinc-900">Offline First</h3>
+            <p className="text-sm text-zinc-500 leading-relaxed">
+              No login required. Your work is yours, even without an internet connection.
+            </p>
           </div>
         </div>
-      </div>
+
+        {/* Footer Info */}
+        <div className="flex flex-col md:flex-row items-center justify-between pt-16 border-t border-zinc-100">
+          <span className="text-sm text-zinc-400 font-medium tracking-tight">
+            © 2026 ascii_canva
+          </span>
+          
+          <div className="flex items-center gap-6">
+            <a 
+              href="https://github.com/cocodrilette/ascii-canva" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm text-zinc-500 hover:text-zinc-900 font-medium transition-colors"
+            >
+              GitHub
+            </a>
+          </div>
+        </div>
+      </main>
+
+      {/* Global Style Override for Background */}
+      <style jsx global>{`
+        body {
+          overflow: auto !important;
+        }
+      `}</style>
     </div>
   );
 }

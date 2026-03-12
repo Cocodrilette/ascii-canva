@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, MousePointer2, Move, Layers, Puzzle, Users, ChevronRight, ChevronLeft } from "lucide-react";
+import { X, MousePointer2, Move, Layers, Puzzle, Users, ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
 
 interface TutorialModalProps {
   onClose: () => void;
@@ -7,95 +7,105 @@ interface TutorialModalProps {
 
 const steps = [
   {
-    title: "Welcome to ascii_canva!",
-    icon: <Puzzle className="text-[#000080]" size={32} />,
-    content: "This is a collaborative ASCII art workspace. You can create diagrams, UI mockups, or simple art using character-based primitives.",
+    title: "Welcome to ascii_canva",
+    icon: <Sparkles className="text-blue-500" size={32} />,
+    content: "A collaborative workspace for character-based art. Create diagrams, mockups, or simple illustrations with precision.",
   },
   {
-    title: "Basic Navigation",
-    icon: <Move className="text-[#000080]" size={32} />,
-    content: "Hold [SPACEBAR] and drag your mouse to pan around the infinite canvas. You can also use the Middle Mouse Button.",
+    title: "Navigate the Canvas",
+    icon: <Move className="text-zinc-600" size={32} />,
+    content: "Hold Space and drag to pan across the infinite workspace. Use your scroll wheel to zoom in and out.",
   },
   {
-    title: "Selecting Objects",
-    icon: <MousePointer2 className="text-[#000080]" size={32} />,
-    content: "Click an object to select it. Hold [CTRL] to select multiple. Drag on the background to start a Marquee selection box.",
+    title: "Select & Edit",
+    icon: <MousePointer2 className="text-zinc-600" size={32} />,
+    content: "Click objects to select them. Hold Command/Ctrl to select multiple. Drag on the background to use the marquee tool.",
   },
   {
-    title: "Layers & Grouping",
-    icon: <Layers className="text-[#000080]" size={32} />,
-    content: "Open the 'Layers' panel to manage object visibility and order. Elements inside a Box move together automatically!",
+    title: "Manage Layers",
+    icon: <Layers className="text-zinc-600" size={32} />,
+    content: "Use the Layers panel to organize your work. You can toggle visibility, lock elements, or change their stacking order.",
   },
   {
-    title: "Community Marketplace",
-    icon: <Puzzle className="text-[#000080]" size={32} />,
-    content: "Browse and install custom extensions from the Marketplace. You can even publish your own logic for others to use.",
+    title: "Extend Capabilities",
+    icon: <Puzzle className="text-zinc-600" size={32} />,
+    content: "Discover and install custom tools from the Marketplace to expand your creative possibilities.",
   },
   {
-    title: "Collaboration",
-    icon: <Users className="text-[#000080]" size={32} />,
-    content: "Click 'Collaborate' to generate a join link. Share it with friends to draw together in real-time!",
+    title: "Collaborate in Real-time",
+    icon: <Users className="text-zinc-600" size={32} />,
+    content: "Share your space with others to build together. Changes sync instantly across all connected sessions.",
   },
 ];
 
-export const TutorialModal: React.FC<TutorialModalProps> = ({ onClose }) => {
+const TutorialModal: React.FC<TutorialModalProps> = ({ onClose }) => {
   const [currentStep, setCurrentStep] = useState(0);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] font-['MS_Sans_Serif']">
-      <div className="w-[400px] border-t-2 border-l-2 border-white border-r-2 border-b-2 border-[#808080] bg-[#C0C0C0] shadow-xl">
-        {/* Title Bar */}
-        <div className="bg-[#000080] text-white flex items-center justify-between px-2 py-1 select-none">
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-['VT323']">TUTORIAL.EXE</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-4 h-4 bg-[#C0C0C0] border-t-2 border-l-2 border-white border-r-2 border-b-2 border-[#808080] flex items-center justify-center text-black active:border-inset p-0"
-          >
-            <X size={10} />
-          </button>
-        </div>
+    <div className="fixed inset-0 bg-white/80 backdrop-blur-xl flex items-center justify-center z-[200] animate-in fade-in duration-500">
+      <div className="w-full max-w-lg p-12 flex flex-col items-center relative">
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-0 right-0 p-2 text-zinc-400 hover:text-zinc-900 transition-colors"
+        >
+          <X size={24} />
+        </button>
 
         {/* Content */}
-        <div className="p-6 flex flex-col items-center text-center gap-4">
-          <div className="p-4 bg-white border-t-2 border-l-2 border-[#808080] border-r-2 border-b-2 border-white rounded-lg">
+        <div className="w-full flex flex-col items-center text-center space-y-10">
+          <div className="w-24 h-24 rounded-[2.5rem] bg-zinc-50 flex items-center justify-center shadow-inner animate-in zoom-in-50 duration-700">
             {steps[currentStep].icon}
           </div>
-          <h2 className="text-sm font-bold uppercase tracking-tight text-[#000080]">
-            {steps[currentStep].title}
-          </h2>
-          <p className="text-[11px] leading-relaxed opacity-80 min-h-[40px]">
-            {steps[currentStep].content}
-          </p>
+          
+          <div className="space-y-4 max-w-sm">
+            <h2 className="text-3xl font-bold tracking-tight text-zinc-900">
+              {steps[currentStep].title}
+            </h2>
+            <p className="text-lg text-zinc-500 font-medium leading-relaxed">
+              {steps[currentStep].content}
+            </p>
+          </div>
         </div>
 
-        {/* Footer / Navigation */}
-        <div className="p-3 bg-[#C0C0C0] border-t border-[#808080] flex items-center justify-between">
-          <div className="text-[10px] font-bold opacity-50">
-            STEP {currentStep + 1} OF {steps.length}
-          </div>
+        {/* Navigation */}
+        <div className="w-full mt-16 flex flex-col items-center space-y-8">
+          {/* Progress Indicators */}
           <div className="flex gap-2">
+            {steps.map((_, i) => (
+              <div 
+                key={i} 
+                className={`h-1.5 rounded-full transition-all duration-500 ${
+                  i === currentStep ? "w-8 bg-zinc-900" : "w-1.5 bg-zinc-200"
+                }`}
+              />
+            ))}
+          </div>
+
+          <div className="w-full flex items-center justify-between">
             <button
               disabled={currentStep === 0}
               onClick={() => setCurrentStep(s => s - 1)}
-              className="retro-button px-3 py-1 flex items-center gap-1 text-[10px] disabled:opacity-30"
+              className="flex items-center gap-2 text-sm font-semibold text-zinc-400 hover:text-zinc-900 disabled:opacity-0 transition-all"
             >
-              <ChevronLeft size={12} /> Back
+              <ChevronLeft size={20} />
+              Previous
             </button>
+
             {currentStep < steps.length - 1 ? (
               <button
                 onClick={() => setCurrentStep(s => s + 1)}
-                className="retro-button px-3 py-1 flex items-center gap-1 text-[10px] font-bold"
+                className="px-8 py-3 rounded-full bg-zinc-900 text-white text-sm font-bold shadow-xl shadow-zinc-900/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
               >
-                Next <ChevronRight size={12} />
+                Continue
+                <ChevronRight size={18} />
               </button>
             ) : (
               <button
                 onClick={onClose}
-                className="retro-button px-6 py-1 text-[10px] font-bold text-green-700 border-green-700"
+                className="px-10 py-3 rounded-full bg-blue-600 text-white text-sm font-bold shadow-xl shadow-blue-600/20 hover:scale-105 active:scale-95 transition-all"
               >
-                Finish
+                Get Started
               </button>
             )}
           </div>
@@ -104,3 +114,5 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ onClose }) => {
     </div>
   );
 };
+
+export default TutorialModal;

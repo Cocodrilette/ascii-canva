@@ -100,7 +100,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => {
   };
 
   const revokeApiKey = async (id: string) => {
-    if (!confirm("Are you sure you want to revoke this API key? This action is permanent for this key.")) return;
+    if (!confirm("Are you sure you want to revoke this API key?")) return;
     setLoading(true);
     const { error } = await supabase
       .from("api_keys")
@@ -125,207 +125,167 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <>
-      <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-        <div className="glass-floating w-full max-w-md shadow-2xl m-4 flex flex-col max-h-[85vh] overflow-hidden border-white/30 animate-in zoom-in-95 duration-300">
-          {/* Header */}
-          <div className="bg-[#000080]/10 px-4 py-4 flex items-center justify-between border-b border-white/20">
-            <div className="flex items-center gap-3 text-[#000080]">
-              <div className="bg-[#000080] p-1.5 rounded-lg text-white shadow-lg shadow-blue-900/20">
-                <Key size={18} />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-bold text-sm tracking-tight">Security Center</span>
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">API_KEY_MANAGER.EXE</span>
-              </div>
-            </div>
+      <div className="fixed inset-0 bg-white/80 backdrop-blur-xl z-[200] overflow-y-auto custom-scrollbar animate-in fade-in duration-500">
+        <div className="min-h-screen w-full flex items-center justify-center p-6 md:p-12">
+          <div className="w-full max-w-2xl flex flex-col items-center relative animate-in zoom-in-95 duration-700">
+            {/* Close Button */}
             <button
-              type="button"
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-zinc-400 hover:text-red-500 transition-all"
+              className="absolute -top-4 -right-4 p-2 text-zinc-400 hover:text-zinc-900 transition-colors md:top-0 md:right-0"
             >
-              <X size={18} />
+              <X size={24} />
             </button>
-          </div>
 
-          <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-            {!user ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
-                <div className="relative">
-                  <ShieldAlert size={64} className="text-[#000080] opacity-20" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Key size={24} className="text-[#000080]" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="font-bold text-lg text-zinc-800">Identity Verification Required</h3>
-                  <p className="text-xs text-zinc-500 max-w-[280px] leading-relaxed">
-                    To access secure terminal functions and manage your persistent workspace keys, please authenticate.
-                  </p>
-                </div>
-                <button 
-                  onClick={() => setShowAuth(true)}
-                  className="genesis-button genesis-button-primary px-8 py-3 rounded-2xl shadow-xl shadow-blue-900/30 font-bold"
-                >
-                  Verify Identity
-                </button>
+            {/* Content */}
+            <div className="w-full flex flex-col items-center text-center space-y-10">
+              <div className="w-24 h-24 rounded-[2.5rem] bg-zinc-50 flex items-center justify-center shadow-inner animate-in zoom-in-50 duration-700">
+                <Key className="text-zinc-600" size={32} />
               </div>
-            ) : (
-              <>
-                {/* Create New Key */}
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Generate New Access Key</label>
-                  <div className="flex gap-2 p-1.5 bg-white/40 rounded-2xl border border-white/60">
-                    <input
-                      type="text"
-                      placeholder="Identifier (e.g. VSCode Assistant)"
-                      className="bg-transparent flex-1 px-3 py-2 text-xs font-medium outline-none placeholder:text-zinc-400"
-                      value={newKeyName}
-                      onChange={(e) => setNewKeyName(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={createApiKey}
-                      disabled={loading || !newKeyName.trim()}
-                      className="genesis-button genesis-button-primary px-4 py-2 rounded-xl text-xs whitespace-nowrap"
-                    >
-                      <Plus size={14} /> Create
-                    </button>
-                  </div>
-                </div>
+              
+              <div className="space-y-4 max-w-sm">
+                <h2 className="text-3xl font-bold tracking-tight text-zinc-900">
+                  Access Keys
+                </h2>
+                <p className="text-lg text-zinc-500 font-medium leading-relaxed">
+                  Manage your credentials and external integrations for a more powerful workspace.
+                </p>
+              </div>
 
-                {generatedKey && (
-                  <div className="p-4 rounded-2xl bg-green-500/10 border border-green-500/20 space-y-3 animate-in slide-in-from-top-4 duration-500">
-                    <div className="flex items-center gap-2 text-green-700">
-                      <Check size={14} className="font-bold" />
-                      <p className="text-[10px] font-black uppercase tracking-widest">Key Secured & Materialized</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <code className="bg-white/80 border border-green-200 px-3 py-2 text-xs rounded-xl flex-1 truncate font-mono text-green-800 font-bold">
-                        {generatedKey}
-                      </code>
+              {!user ? (
+                <div className="flex flex-col items-center gap-6 py-8">
+                  <ShieldAlert size={48} className="text-amber-500" />
+                  <p className="text-zinc-500 font-medium max-w-xs">
+                    Please sign in to manage your access keys and secure your workspace.
+                  </p>
+                  <button 
+                    onClick={() => setShowAuth(true)}
+                    className="px-10 py-3 rounded-full bg-zinc-900 text-white text-sm font-bold shadow-xl shadow-zinc-900/20 hover:scale-105 active:scale-95 transition-all"
+                  >
+                    Sign In
+                  </button>
+                </div>
+              ) : (
+                <div className="w-full space-y-12 pt-4 text-left">
+                  {/* Create Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest px-2">Create New Key</h3>
+                    <div className="flex gap-2 p-2 bg-zinc-50 rounded-[2rem] border border-zinc-100 group focus-within:ring-4 focus-within:ring-zinc-900/5 transition-all">
+                      <input
+                        type="text"
+                        placeholder="Give your key a name..."
+                        className="bg-transparent flex-1 px-6 py-3 text-sm font-medium text-zinc-600 outline-none"
+                        value={newKeyName}
+                        onChange={(e) => setNewKeyName(e.target.value)}
+                      />
                       <button
                         type="button"
-                        onClick={() => copyToClipboard(generatedKey)}
-                        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-green-200 text-green-600 shadow-sm hover:shadow-md transition-all active:scale-90"
+                        onClick={createApiKey}
+                        disabled={loading || !newKeyName.trim()}
+                        className="px-6 py-3 rounded-full bg-zinc-900 text-white text-sm font-bold flex items-center gap-2 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
                       >
-                        {copySuccess ? <Check size={16} /> : <Copy size={16} />}
+                        <Plus size={18} /> Create
                       </button>
                     </div>
-                    <p className="text-[9px] text-green-600 font-medium italic">Copy this key now. For your security, it will only be displayed once.</p>
                   </div>
-                )}
 
-                {/* Key List */}
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Active Credentials</label>
-                  <div className="bg-white/40 rounded-2xl border border-white/60 overflow-hidden shadow-inner">
-                    <table className="w-full border-collapse">
-                      <thead className="bg-white/40 border-b border-white/60">
-                        <tr className="text-left text-[9px] font-black uppercase tracking-tighter text-zinc-400">
-                          <th className="px-4 py-2 font-black">Identity</th>
-                          <th className="px-4 py-2 font-black text-center">Status</th>
-                          <th className="px-4 py-2 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/40">
-                        {apiKeys.length === 0 && !loading && (
-                          <tr>
-                            <td colSpan={3} className="px-4 py-8 text-center text-zinc-400 text-[11px] italic">No active neural links found.</td>
-                          </tr>
-                        )}
-                        {apiKeys.map((key) => (
-                          <tr key={key.id} className={`group hover:bg-white/20 transition-colors ${key.status === 'revoked' ? 'opacity-40' : ''}`}>
-                            <td className="px-4 py-3">
-                              <div className="flex flex-col">
-                                <span className="text-xs font-bold text-zinc-700 truncate max-w-[140px]">{key.name}</span>
-                                <span className="text-[9px] font-medium text-zinc-400">Issued {new Date(key.created_at).toLocaleDateString()}</span>
+                  {generatedKey && (
+                    <div className="p-6 rounded-[2rem] bg-emerald-50 border border-emerald-100 space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+                      <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest px-2">New Key Created</p>
+                      <div className="relative group">
+                        <input
+                          type="text"
+                          readOnly
+                          value={generatedKey}
+                          className="w-full bg-white border border-emerald-200 rounded-full py-4 pl-6 pr-16 text-sm font-mono font-bold text-emerald-800 outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(generatedKey)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white border border-emerald-200 text-emerald-600 shadow-sm hover:scale-105 active:scale-95 transition-all"
+                        >
+                          {copySuccess ? <Check size={18} className="text-emerald-500" /> : <Copy size={18} />}
+                        </button>
+                      </div>
+                      <p className="text-xs text-emerald-600 font-medium italic px-2">
+                        Copy this key now. It won't be shown again.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* List Section */}
+                  {apiKeys.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest px-2">Your Keys</h3>
+                      <div className="bg-zinc-50 rounded-[2.5rem] border border-zinc-100 overflow-hidden">
+                        <div className="divide-y divide-zinc-200/50">
+                          {apiKeys.map((key) => (
+                            <div key={key.id} className={`p-6 flex items-center justify-between group hover:bg-white/50 transition-colors ${key.status === 'revoked' ? 'opacity-40' : ''}`}>
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm font-bold text-zinc-900">{key.name}</span>
+                                <span className="text-[10px] font-medium text-zinc-400">Created {new Date(key.created_at).toLocaleDateString()}</span>
                               </div>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight ${
-                                key.status === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-zinc-100 text-zinc-500 border border-zinc-200'
-                              }`}>
-                                {key.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {key.status === 'active' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => revokeApiKey(key.id)}
-                                  className="text-[10px] font-bold text-red-400 hover:text-red-600 transition-colors flex items-center gap-1 ml-auto"
-                                >
-                                  <Trash2 size={12} /> Revoke
-                                </button>
-                              ) : (
-                                <span className="text-[9px] font-bold text-zinc-400 uppercase">Revoked</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                              <div className="flex items-center gap-4">
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tight ${
+                                  key.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-200 text-zinc-500'
+                                }`}>
+                                  {key.status}
+                                </span>
+                                {key.status === 'active' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => revokeApiKey(key.id)}
+                                    className="p-2 text-zinc-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Revoke Key"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                {/* External AI Integration */}
-                <div className="pt-6 border-t border-zinc-200 space-y-4">
-                  <div className="flex items-center gap-3 text-zinc-800">
-                    <div className="bg-zinc-100 p-1.5 rounded-lg">
-                      <Cpu size={16} className="text-[#000080]" />
+                  {/* AI Integration */}
+                  <div className="space-y-6 pt-4">
+                    <div className="flex items-center gap-3">
+                      <Cpu size={24} className="text-zinc-400" />
+                      <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">AI Integration</h3>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="font-bold text-xs">External AI Integration</span>
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Neural Link Pipeline</span>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50 space-y-3">
-                    <p className="text-[10px] text-blue-700/80 leading-relaxed font-medium">
-                      Enable AI-powered diagram generation by linking your Google Gemini API key. 
-                      Stored <span className="font-bold underline">locally in-session</span> for privacy.
-                    </p>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        placeholder="Neural Access Key (AI_...)"
-                        className="w-full bg-white border border-blue-100 rounded-xl px-4 py-2.5 text-xs font-mono outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/20 transition-all"
-                        value={geminiApiKey}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setGeminiApiKey(val);
-                          localStorage.setItem("GEMINI_API_KEY", val);
-                        }}
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <Key size={14} className="text-blue-300" />
+                    <div className="p-8 rounded-[2.5rem] bg-blue-50 border border-blue-100 space-y-6">
+                      <p className="text-sm text-blue-700 font-medium leading-relaxed">
+                        Link your Gemini API key to enable intelligent diagram generation. Stored locally in your session.
+                      </p>
+                      <div className="relative group">
+                        <input
+                          type="password"
+                          placeholder="Gemini API Key..."
+                          className="w-full bg-white border border-blue-200 rounded-full py-4 px-6 text-sm font-mono text-zinc-600 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
+                          value={geminiApiKey}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setGeminiApiKey(val);
+                            localStorage.setItem("GEMINI_API_KEY", val);
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
                 </div>
-              </>
-            )}
-          </div>
-
-          <div className="p-4 bg-[#F8FAFC] border-t border-white/20 flex justify-between items-center text-[9px] font-bold uppercase tracking-widest text-zinc-400">
-            <div className="flex items-center gap-3">
-               <div className="flex items-center gap-1.5">
-                 <div className={`w-1.5 h-1.5 rounded-full ${loading ? 'bg-blue-500 animate-pulse' : 'bg-green-500'}`} />
-                 <span>Pipeline: {loading ? "Syncing" : "Encrypted"}</span>
-               </div>
-               <RefreshCw 
-                 size={12} 
-                 className={`cursor-pointer hover:text-[#000080] transition-colors ${loading ? "animate-spin text-blue-500" : ""}`} 
-                 onClick={fetchApiKeys} 
-               />
+              )}
             </div>
-            <button 
-              type="button" 
-              onClick={onClose} 
-              className="genesis-button h-8 px-6 font-bold"
-            >
-              Close
-            </button>
+
+            {/* Footer */}
+            <div className="w-full mt-16 flex justify-center">
+              <button
+                onClick={onClose}
+                className="text-sm font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       </div>

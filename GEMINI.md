@@ -77,65 +77,25 @@ UI Component
 
 All external API calls go through `src/proxy.ts`. Sessions are managed via HTTP-only cookies. API keys are never exposed to the client.
 
-### Design System
+## 🎨 Design System: "The Glass Standard"
 
-Components follow the **Retro OS Standard** — inspired by classic operating systems (Win95, Mac OS 8, early UNIX terminals).
+The "Genesis" aesthetic is defined by elements that levitate and interact with light.
 
-#### Palette
+### Glassmorphism Utility (Tailwind)
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--os-bg` | `#C0C0C0` | Window backgrounds |
-| `--os-surface` | `#FFFFFF` | Input fields, content areas |
-| `--os-titlebar` | `#000080` | Active window title bars |
-| `--os-titlebar-text` | `#FFFFFF` | Title bar labels |
-| `--os-border-light` | `#FFFFFF` | Raised bevel (top/left) |
-| `--os-border-dark` | `#808080` | Sunken bevel (bottom/right) |
-| `--os-accent` | `#000080` | Selected items, CTAs |
-| `--os-terminal` | `#0D0D0D` | Terminal/log panels |
-| `--os-green` | `#00FF41` | Terminal cursor, status indicators |
+```bash
+# Light Mode
+bg-white/60 backdrop-blur-xl border border-white/40 shadow-xl rounded-3xl
 
-#### Window Chrome
-
-```css
-/* Raised panel (buttons, cards) */
-border-top: 2px solid #FFFFFF;
-border-left: 2px solid #FFFFFF;
-border-right: 2px solid #808080;
-border-bottom: 2px solid #808080;
-background: #C0C0C0;
-
-/* Sunken panel (inputs, wells) */
-border-top: 2px solid #808080;
-border-left: 2px solid #808080;
-border-right: 2px solid #FFFFFF;
-border-bottom: 2px solid #FFFFFF;
-background: #FFFFFF;
-
-/* Title bar */
-background: #000080;
-color: #FFFFFF;
-font-family: 'VT323', 'Courier New', monospace;
-font-size: 12px;
-padding: 2px 4px;
+# Dark Mode
+dark:bg-zinc-900/60 dark:border-zinc-800/50 dark:shadow-2xl
 ```
 
-#### Typography
+### UX Principles
 
-| Role | Font | Size |
-|------|------|------|
-| UI Labels | `'MS Sans Serif', sans-serif` | 11px |
-| Title bars | `'VT323', monospace` | 13px |
-| Terminal output | `'Courier New', monospace` | 13px |
-| Body text | `'Times New Roman', serif` | 14px |
-
-#### UX Principles
-
-1. **No blur, no transparency** — all surfaces are fully opaque with hard bevel borders.
-2. **8px grid** — spacing in multiples of 8; no fractional values.
-3. **Cursor** — use `cursor-default` everywhere except links (`cursor-pointer` with a classic arrow, not a hand on interactive widgets).
-4. **Loading states** — use a blinking `█` cursor or a classic progress bar (segmented, not a smooth fill).
-5. **Modals** — styled as draggable OS dialog boxes with a title bar, close button (`✕`), and raised content area.
+1. **High Density**: Prefer `p-4` or `p-6` over `p-10`. Content should be visible without excessive scrolling.
+2. **Stable Layouts**: Use fixed-height skeletons during loading. Avoid "jumping" UI elements.
+3. **Interactive Feedback**: All calculations should be traceable (clickable cards with detail modals).
 
 ---
 

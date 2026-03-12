@@ -39,11 +39,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 
     // 2. Resolve Space
-    // First, try to find by ID (UUID) or by Slug
-    const { data: spaceData, error: spaceError } = await supabase
-      .from("spaces")
-      .select("id, owner_id").eq("id", spaceId)
-      .maybeSingle();
+    // Support both ID (UUID) and Slug
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(spaceId as string);
+    
+    let query = supabase.from("spaces").select("id, owner_id");
+    
+    if (isUuid) {
+      query = query.or(`id.eq.${spaceId},slug.eq.${spaceId}`);
+    } else {
+      query = query.eq("slug", spaceId);
+    }
+
+    const { data: spaceData, error: spaceError } = await query.maybeSingle();
 
     if (spaceError || !spaceData) {
       console.log("Space lookup failed for ID/Slug:", spaceId, spaceError);

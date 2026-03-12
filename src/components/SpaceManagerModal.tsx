@@ -1,4 +1,4 @@
-import { X, Layout, Plus, ExternalLink, Copy, Check, Hash, Globe, ChevronRight } from "lucide-react";
+import { X, Layout, Plus, Copy, Check, Hash, Globe, ChevronRight, ShieldAlert } from "lucide-react";
 import type React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { sileo } from "sileo";
@@ -16,9 +16,15 @@ interface SpaceManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSwitchSpace: (slug: string) => void;
+  activeSpaceId?: string;
 }
 
-const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({ isOpen, onClose, onSwitchSpace }) => {
+const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSwitchSpace,
+  activeSpaceId 
+}) => {
   const [user, setUser] = useState<any>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -69,7 +75,7 @@ const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({ isOpen, onClose, 
     });
 
     if (error) {
-      sileo.error({ title: "Sector Registration Failure", description: error.message });
+      sileo.error({ title: "Registration Failure", description: error.message });
     } else {
       setNewName("");
       setNewSlug("");
@@ -88,144 +94,161 @@ const SpaceManagerModal: React.FC<SpaceManagerModalProps> = ({ isOpen, onClose, 
 
   return (
     <>
-      <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-        <div className="glass-floating w-full max-w-md shadow-2xl m-4 flex flex-col max-h-[85vh] overflow-hidden border-white/30 animate-in zoom-in-95 duration-300">
-          {/* Header */}
-          <div className="bg-[#000080]/10 px-4 py-4 flex items-center justify-between border-b border-white/20">
-            <div className="flex items-center gap-3 text-[#000080]">
-              <div className="bg-[#000080] p-1.5 rounded-lg text-white shadow-lg shadow-blue-900/20">
-                <Layout size={18} />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-bold text-sm tracking-tight">Space Explorer</span>
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">WORKSPACE_INDEX.V2</span>
-              </div>
-            </div>
+      <div className="fixed inset-0 bg-white/80 backdrop-blur-xl z-[200] overflow-y-auto custom-scrollbar animate-in fade-in duration-500">
+        <div className="min-h-screen w-full flex items-center justify-center p-6 md:p-12">
+          <div className="w-full max-w-2xl flex flex-col items-center relative animate-in zoom-in-95 duration-700">
+            {/* Close Button */}
             <button
-              type="button"
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-zinc-400 hover:text-red-500 transition-all"
+              className="absolute -top-4 -right-4 p-2 text-zinc-400 hover:text-zinc-900 transition-colors md:top-0 md:right-0"
             >
-              <X size={18} />
+              <X size={24} />
             </button>
-          </div>
 
-          <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar bg-white/20">
-            {!user ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
-                <div className="bg-zinc-100 p-6 rounded-full relative shadow-inner">
-                  <Globe size={48} className="text-[#000080] opacity-30" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Plus size={24} className="text-[#000080]" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="font-bold text-lg text-zinc-800">Cloud Sync Required</h3>
-                  <p className="text-xs text-zinc-500 max-w-[280px] leading-relaxed">
-                    Initialize your operator profile to manage persistent canvas spaces and establish secure neural links.
-                  </p>
-                </div>
-                <button 
-                  onClick={() => setShowAuth(true)}
-                  className="genesis-button genesis-button-primary px-8 py-3 rounded-2xl shadow-xl shadow-blue-900/30 font-bold"
-                >
-                  Sync Profile
-                </button>
+            {/* Content */}
+            <div className="w-full flex flex-col items-center text-center space-y-10">
+              <div className="w-24 h-24 rounded-[2.5rem] bg-zinc-50 flex items-center justify-center shadow-inner animate-in zoom-in-50 duration-700">
+                <Layout className="text-zinc-600" size={32} />
               </div>
-            ) : (
-              <>
-                {/* Create New Space */}
-                <div className="p-4 rounded-2xl bg-white/40 border border-white/60 space-y-4 shadow-sm">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Initialize Workspace</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <input
-                        type="text"
-                        placeholder="Project Name"
-                        className="w-full bg-white/60 border border-white/60 rounded-xl px-3 py-2 text-xs font-medium outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <input
-                        type="text"
-                        placeholder="SLUG-01"
-                        className="w-full bg-white/60 border border-white/60 rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none focus:ring-4 focus:ring-blue-500/5 transition-all uppercase"
-                        value={newSlug}
-                        onChange={(e) => setNewSlug(e.target.value.toUpperCase())}
-                      />
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={createSpace}
-                    disabled={loading || !newName.trim() || !newSlug.trim()}
-                    className="genesis-button genesis-button-primary w-full py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold text-xs"
+              
+              <div className="space-y-4 max-w-sm">
+                <h2 className="text-3xl font-bold tracking-tight text-zinc-900">
+                  Workspace
+                </h2>
+                <p className="text-lg text-zinc-500 font-medium leading-relaxed">
+                  Organize your projects into sectors. Use the Space ID for programmatic access via API.
+                </p>
+              </div>
+
+              {!user ? (
+                <div className="flex flex-col items-center gap-6 py-8">
+                  <Globe size={48} className="text-blue-500" />
+                  <p className="text-zinc-500 font-medium max-w-xs">
+                    Sign in to create and manage your persistent workspace sectors.
+                  </p>
+                  <button 
+                    onClick={() => setShowAuth(true)}
+                    className="px-10 py-3 rounded-full bg-zinc-900 text-white text-sm font-bold shadow-xl shadow-zinc-900/20 hover:scale-105 active:scale-95 transition-all"
                   >
-                    <Plus size={14} /> Register New Sector
+                    Sign In
                   </button>
                 </div>
-
-                {/* Space List */}
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Registered Sectors</label>
-                  <div className="rounded-2xl border border-white/60 overflow-hidden bg-white/40 shadow-inner min-h-[200px]">
-                    {spaces.length === 0 && !loading && (
-                      <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
-                        <Layout size={32} className="opacity-20 mb-2" />
-                        <p className="text-[11px] italic">No active sectors detected.</p>
+              ) : (
+                <div className="w-full space-y-12 pt-4 text-left">
+                  {/* Create Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between px-2">
+                      <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">New Sector</h3>
+                    </div>
+                    <div className="bg-zinc-50 rounded-[2.5rem] border border-zinc-100 p-2 space-y-2">
+                      <div className="flex flex-col md:flex-row gap-2">
+                        <input
+                          type="text"
+                          placeholder="Project Name..."
+                          className="bg-white border border-zinc-100 flex-1 px-6 py-3 rounded-full text-sm font-medium text-zinc-600 outline-none focus:ring-4 focus:ring-zinc-900/5 transition-all"
+                          value={newName}
+                          onChange={(e) => setNewName(e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Slug..."
+                          className="bg-white border border-zinc-100 w-full md:w-32 px-6 py-3 rounded-full text-sm font-mono font-bold text-zinc-600 outline-none focus:ring-4 focus:ring-zinc-900/5 transition-all uppercase"
+                          value={newSlug}
+                          onChange={(e) => setNewSlug(e.target.value.toUpperCase())}
+                        />
                       </div>
-                    )}
-                    <div className="divide-y divide-white/60">
-                      {spaces.map((space) => (
-                        <div key={space.id} className="p-4 hover:bg-white/40 transition-all group cursor-default">
-                          <div className="flex justify-between items-start">
-                            <div className="space-y-1.5">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-xs text-zinc-800">{space.name}</span>
-                                <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-tight">
-                                  {space.slug}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="text-[9px] text-zinc-400 font-mono flex items-center gap-1">
-                                  <Hash size={10} className="opacity-50" />
-                                  <span className="truncate max-w-[100px]">{space.id}</span>
-                                  <button 
-                                    onClick={() => copyToClipboard(space.id, space.id)}
-                                    className="ml-1 text-blue-400 hover:text-blue-600 transition-colors"
-                                  >
-                                    {copyId === space.id ? <Check size={10} /> : <Copy size={10} />}
-                                  </button>
-                                </div>
-                                <div className="w-1 h-1 bg-zinc-300 rounded-full" />
-                                <span className="text-[9px] text-zinc-400 font-medium">Created {new Date(space.created_at).toLocaleDateString()}</span>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => onSwitchSpace(space.slug)}
-                              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-zinc-200 text-[#000080] shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all"
-                              title="Engage Space"
+                      <button
+                        type="button"
+                        onClick={createSpace}
+                        disabled={loading || !newName.trim() || !newSlug.trim()}
+                        className="w-full py-4 rounded-full bg-zinc-900 text-white text-sm font-bold flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 transition-all disabled:opacity-50"
+                      >
+                        <Plus size={18} /> Create Sector
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Current Space Info (If active) */}
+                  {activeSpaceId && spaces.find(s => s.id === activeSpaceId) && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest px-2">Active Sector</h3>
+                      <div className="p-8 rounded-[2.5rem] bg-blue-50 border border-blue-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex flex-col gap-1 text-center md:text-left">
+                          <span className="text-lg font-bold text-blue-900">
+                            {spaces.find(s => s.id === activeSpaceId)?.name}
+                          </span>
+                          <span className="text-xs font-medium text-blue-600 uppercase tracking-widest">
+                            Currently engaged
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center md:items-end gap-2">
+                          <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Space ID (API)</span>
+                          <div className="flex items-center gap-2 bg-white/60 border border-blue-200 px-4 py-2 rounded-full">
+                            <code className="text-xs font-mono font-bold text-blue-800">{activeSpaceId}</code>
+                            <button 
+                              onClick={() => copyToClipboard(activeSpaceId, activeSpaceId)}
+                              className="p-1 hover:scale-110 transition-transform"
                             >
-                              <ChevronRight size={18} />
+                              {copyId === activeSpaceId ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} className="text-blue-400" />}
                             </button>
                           </div>
                         </div>
-                      ))}
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+                  )}
 
-          <div className="p-4 bg-[#F8FAFC] border-t border-white/20 flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-zinc-400">
-             <div className="flex items-center gap-2">
-               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-               <span>Sectors: {spaces.length}</span>
-             </div>
-             <button type="button" onClick={onClose} className="genesis-button h-8 px-6 font-bold">Close</button>
+                  {/* List Section */}
+                  {spaces.filter(s => s.id !== activeSpaceId).length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest px-2">Other Sectors</h3>
+                      <div className="bg-zinc-50 rounded-[2.5rem] border border-zinc-100 overflow-hidden">
+                        <div className="divide-y divide-zinc-200/50">
+                          {spaces.filter(s => s.id !== activeSpaceId).map((space) => (
+                            <div key={space.id} className="p-6 flex items-center justify-between group hover:bg-white/50 transition-colors">
+                              <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm font-bold text-zinc-900">{space.name}</span>
+                                  <span className="px-2 py-0.5 rounded-md bg-zinc-200 text-zinc-600 text-[10px] font-bold font-mono">
+                                    {space.slug}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-zinc-400">
+                                  <Hash size={12} />
+                                  <span className="text-[10px] font-medium truncate max-w-[120px]">{space.id}</span>
+                                  <button 
+                                    onClick={() => copyToClipboard(space.id, space.id)}
+                                    className="hover:text-zinc-900 transition-colors"
+                                  >
+                                    {copyId === space.id ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                                  </button>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => onSwitchSpace(space.slug)}
+                                className="w-12 h-12 flex items-center justify-center rounded-full bg-white border border-zinc-100 text-zinc-900 shadow-sm hover:scale-110 active:scale-90 transition-all"
+                                title="Engage Sector"
+                              >
+                                <ChevronRight size={24} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="w-full mt-16 flex justify-center">
+              <button
+                onClick={onClose}
+                className="text-sm font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       </div>

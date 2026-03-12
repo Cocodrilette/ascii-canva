@@ -1,4 +1,4 @@
-import { X, Lock, Mail, UserPlus, LogIn, AlertCircle } from "lucide-react";
+import { X, Lock, Mail, UserPlus, LogIn, AlertCircle, ShieldCheck } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { sileo } from "sileo";
@@ -50,65 +50,79 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
-      <div className="window-raised w-full max-w-sm shadow-[8px_8px_0_rgba(0,0,0,0.5)] m-4 flex flex-col">
-        <div className="bg-[#000080] text-white px-2 py-1 flex items-center justify-between font-['VT323'] text-sm">
-          <div className="flex items-center gap-2">
-            <Lock size={14} />
-            <span>{mode === "login" ? "SYSTEM_LOGIN.EXE" : "USER_REGISTRATION.EXE"}</span>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="glass-floating w-full max-w-sm shadow-2xl m-4 flex flex-col overflow-hidden border-white/30 animate-in zoom-in-95 duration-300">
+        {/* Header */}
+        <div className="bg-[#000080]/10 px-4 py-4 flex items-center justify-between border-b border-white/20">
+          <div className="flex items-center gap-3 text-[#000080]">
+            <div className="bg-[#000080] p-1.5 rounded-lg text-white shadow-lg shadow-blue-900/20">
+              <Lock size={16} />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-xs tracking-tight">Identity Gateway</span>
+              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">
+                {mode === "login" ? "SESSION_INIT.EXE" : "IDENTITY_CREATION.EXE"}
+              </span>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-4 h-4 bg-[#C0C0C0] border-t-2 border-l-2 border-white border-r-2 border-b-2 border-[#808080] flex items-center justify-center text-black active:border-inset p-0"
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-zinc-400 hover:text-red-500 transition-all"
           >
-            <X size={10} />
+            <X size={16} />
           </button>
         </div>
 
-        <div className="p-6 bg-[#C0C0C0] space-y-6">
+        <div className="p-6 space-y-6">
           <div className="text-center space-y-2">
-            <h2 className="font-['VT323'] text-2xl uppercase tracking-tighter">
-              {mode === "login" ? "Access Terminal" : "Create Account"}
+            <h2 className="text-2xl font-black tracking-tighter text-zinc-800 uppercase">
+              {mode === "login" ? "Welcome Back" : "Begin Journey"}
             </h2>
-            <p className="text-[10px] uppercase font-bold text-gray-600">
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
               {mode === "login" 
-                ? "Identification required for cloud features." 
-                : "Register to sync your workspace data."}
+                ? "Identity verification required for cloud sync." 
+                : "Register your signature to sync workspace."}
             </p>
           </div>
 
           <form onSubmit={handleAuth} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold block uppercase flex items-center gap-1">
-                <Mail size={12} /> Email Address:
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">
+                Operator Signal
               </label>
-              <input
-                type="email"
-                required
-                className="window-sunken w-full px-2 py-1.5 text-[11px] outline-none font-mono"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@system.net"
-              />
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  className="w-full bg-white/60 border border-white/60 rounded-xl px-4 py-2.5 pl-10 text-xs font-medium outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="user@neural.net"
+                />
+                <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+              </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold block uppercase flex items-center gap-1">
-                <Lock size={12} /> Password:
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">
+                Access Code
               </label>
-              <input
-                type="password"
-                required
-                className="window-sunken w-full px-2 py-1.5 text-[11px] outline-none font-mono"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="********"
-              />
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  className="w-full bg-white/60 border border-white/60 rounded-xl px-4 py-2.5 pl-10 text-xs font-medium outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="********"
+                />
+                <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+              </div>
             </div>
 
             {error && (
-              <div className="p-2 border-2 border-red-600 bg-red-50 text-red-700 text-[10px] font-bold flex gap-2 items-center animate-pulse">
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-[10px] font-bold flex gap-2 items-center animate-in slide-in-from-top-2">
                 <AlertCircle size={14} />
                 <span>{error}</span>
               </div>
@@ -117,33 +131,34 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
             <button
               type="submit"
               disabled={loading}
-              className="retro-button w-full py-2 flex items-center justify-center gap-2 font-bold uppercase text-xs"
+              className="genesis-button genesis-button-primary w-full py-3 rounded-2xl flex items-center justify-center gap-2 font-bold uppercase text-xs shadow-xl shadow-blue-900/20 active:scale-95 transition-all"
             >
               {loading ? (
-                <span className="animate-pulse">Processing...</span>
+                <span className="animate-pulse">Authorizing...</span>
               ) : mode === "login" ? (
-                <><LogIn size={14} /> Initialize Login</>
+                <><LogIn size={16} /> Initialize Session</>
               ) : (
-                <><UserPlus size={14} /> Confirm Signup</>
+                <><UserPlus size={16} /> Finalize Registration</>
               )}
             </button>
           </form>
 
-          <div className="pt-4 border-t border-gray-400 text-center">
+          <div className="pt-4 border-t border-zinc-200 text-center">
             <button
               type="button"
               onClick={() => setMode(mode === "login" ? "signup" : "login")}
-              className="text-[10px] uppercase font-bold text-[var(--os-titlebar)] hover:underline"
+              className="text-[10px] font-bold text-blue-600 hover:text-blue-800 transition-colors uppercase tracking-widest"
             >
               {mode === "login" 
-                ? "Don't have an account? Register here" 
-                : "Already registered? Switch to login"}
+                ? "Request New Identity" 
+                : "Existing Identity detected"}
             </button>
           </div>
         </div>
 
-        <div className="p-2 border-t-2 border-[#808080] flex justify-center text-[9px] font-bold uppercase text-gray-500 bg-[#C0C0C0]">
-          SECURE_ENCRYPTION_LAYER_ACTIVE
+        <div className="p-3 bg-white/40 border-t border-white/20 flex justify-center items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-400">
+          <ShieldCheck size={12} className="text-emerald-500" />
+          <span>Encrypted Tunnel Active</span>
         </div>
       </div>
     </div>

@@ -9,6 +9,7 @@ import {
   Lock,
   Trash2,
   Unlock,
+  X,
 } from "lucide-react";
 import type React from "react";
 import { hasExtension } from "../extensions/registry";
@@ -65,155 +66,149 @@ const LayerManager: React.FC<LayerManagerProps> = ({
   };
 
   return (
-    <div className="fixed top-20 right-4 z-[150] w-64 shadow-[4px_4px_0_rgba(0,0,0,0.5)] window-raised">
-      <div className="title-bar cursor-default">
-        <span className="flex items-center gap-2 font-bold">
-          <Layers className="w-3 h-3" /> Explorer.exe
-        </span>
+    <div className="fixed top-24 right-6 z-[150] w-72 glass-floating shadow-2xl flex flex-col max-h-[500px] border-white/30 animate-in slide-in-from-right-4 duration-300">
+      {/* Header */}
+      <div className="px-5 py-4 flex items-center justify-between border-b border-white/20">
+        <span className="font-bold text-sm tracking-tight text-zinc-800">Layers</span>
         <button
           type="button"
           onClick={onClose}
-          className="retro-button px-1 py-0 leading-none h-4 w-4 flex items-center justify-center font-bold"
+          className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-zinc-100 text-zinc-400 hover:text-zinc-900 transition-all"
         >
-          ✕
+          <X size={14} />
         </button>
       </div>
 
-      <div className="p-2 bg-[var(--os-bg)] flex flex-col gap-2 max-h-[400px]">
-        <div className="window-sunken bg-white flex-1 overflow-y-auto min-h-[100px]">
-          <table className="w-full text-[10px] border-collapse">
-            <thead className="sticky top-0 bg-gray-100 shadow-sm">
-              <tr className="border-b border-gray-200">
-                <th className="p-1 text-left w-8">Vis</th>
-                <th className="p-1 text-left w-8">Lck</th>
-                <th className="p-1 text-left">Element</th>
-                <th className="p-1 text-right w-16">Z-Pos</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...elements].reverse().map((el, revIdx) => {
-                const idx = elements.length - 1 - revIdx;
-                const isSelected = selectedIds.includes(el.id);
-                return (
-                  <tr
-                    key={el.id}
-                    className={`border-b border-gray-50 hover:bg-blue-50 cursor-default ${
-                      isSelected ? "bg-blue-100 font-bold" : ""
-                    }`}
-                    onClick={(e) => handleRowClick(e, el.id)}
-                  >
-                    <td className="p-1 text-center">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleVisibility(el.id);
-                        }}
-                        className="hover:text-blue-600"
-                        title={el.hidden ? "Show" : "Hide"}
-                      >
-                        {el.hidden ? (
-                          <EyeOff className="w-3 h-3 text-gray-400" />
-                        ) : (
-                          <Eye className="w-3 h-3" />
-                        )}
-                      </button>
-                    </td>
-                    <td className="p-1 text-center">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleLock(el.id);
-                        }}
-                        className="hover:text-blue-600"
-                        title={el.locked ? "Unlock" : "Lock"}
-                      >
-                        {el.locked ? (
-                          <Lock className="w-3 h-3 text-red-500" />
-                        ) : (
-                          <Unlock className="w-3 h-3" />
-                        )}
-                      </button>
-                    </td>
-                    <td className="p-1 truncate">
-                      <span className="opacity-70 mr-1">#{idx}</span>
-                      {el.type.toUpperCase()}
-                      {!hasExtension(el.type) && (
-                        <span className="text-red-500 ml-1 font-bold">(MISSING)</span>
-                      )}
-                    </td>
-                    <td className="p-1 text-right flex gap-1 justify-end">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteElement(el.id);
-                        }}
-                        className="hover:text-red-600 mr-1"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMoveLayer(el.id, "up");
-                        }}
-                        disabled={idx === elements.length - 1}
-                        className="disabled:opacity-20"
-                        title="Move Up"
-                      >
-                        <ChevronUp className="w-3 h-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMoveLayer(el.id, "down");
-                        }}
-                        disabled={idx === 0}
-                        className="disabled:opacity-20"
-                        title="Move Down"
-                      >
-                        <ChevronDown className="w-3 h-3" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {elements.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="p-4 text-center italic text-gray-400">
-                    Empty Canvas
-                  </td>
+      <div className="p-4 flex flex-col gap-4 overflow-hidden">
+        <div className="bg-white/30 rounded-2xl border border-white/50 overflow-hidden shadow-inner flex-1 flex flex-col min-h-[140px]">
+          <div className="overflow-y-auto custom-scrollbar flex-1">
+            <table className="w-full text-[10px] border-collapse">
+              <thead className="sticky top-0 bg-white/40 backdrop-blur-xl border-b border-white/40 z-10">
+                <tr className="text-left text-[9px] font-black uppercase tracking-tighter text-zinc-400">
+                  <th className="px-4 py-3">State</th>
+                  <th className="px-4 py-3">Element</th>
+                  <th className="px-4 py-3 text-right">Ops</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/40">
+                {[...elements].reverse().map((el, revIdx) => {
+                  const idx = elements.length - 1 - revIdx;
+                  const isSelected = selectedIds.includes(el.id);
+                  return (
+                    <tr
+                      key={el.id}
+                      className={`group hover:bg-white/40 transition-colors cursor-default ${
+                        isSelected ? "bg-white/60 font-bold" : ""
+                      }`}
+                      onClick={(e) => handleRowClick(e, el.id)}
+                    >
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleVisibility(el.id);
+                            }}
+                            className={`transition-colors ${el.hidden ? "text-zinc-400" : "text-blue-600"}`}
+                            title={el.hidden ? "Show" : "Hide"}
+                          >
+                            {el.hidden ? <EyeOff size={12} /> : <Eye size={12} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleLock(el.id);
+                            }}
+                            className={`transition-colors ${el.locked ? "text-red-500" : "text-zinc-400 hover:text-zinc-900"}`}
+                            title={el.locked ? "Unlock" : "Lock"}
+                          >
+                            {el.locked ? <Lock size={12} /> : <Unlock size={12} />}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-col">
+                          <span className={`text-[11px] ${isSelected ? "text-zinc-900" : "text-zinc-700"}`}>
+                            {el.type.toLowerCase()}
+                            {!hasExtension(el.type) && (
+                              <span className="text-red-500 ml-1 font-black">(!)</span>
+                            )}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveLayer(el.id, "up");
+                            }}
+                            disabled={idx === elements.length - 1}
+                            className="p-1 hover:bg-white rounded-md text-zinc-400 hover:text-zinc-900 disabled:opacity-0"
+                          >
+                            <ChevronUp size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveLayer(el.id, "down");
+                            }}
+                            disabled={idx === 0}
+                            className="p-1 hover:bg-white rounded-md text-zinc-400 hover:text-zinc-900 disabled:opacity-0"
+                          >
+                            <ChevronDown size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteElement(el.id);
+                            }}
+                            className="p-1 hover:bg-red-50 rounded-md text-zinc-400 hover:text-red-500"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {elements.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-12 text-center text-zinc-400 text-[11px] italic">No elements yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {selectedIds.length === 1 && (
-          <div className="flex gap-1 justify-between p-1 bg-gray-100 border border-[var(--os-border-dark)]">
+          <div className="flex gap-2 p-1 animate-in zoom-in-95 duration-200">
             <button
               type="button"
               onClick={() => handleMoveLayer(selectedIds[0], "back")}
-              className="retro-button px-2 py-1 text-[9px] flex items-center gap-1"
-              title="Send to Back"
+              className="genesis-button flex-1 h-8 text-[10px] font-semibold justify-center"
             >
-              <ArrowDownToLine className="w-3 h-3" /> Back
+              <ArrowDownToLine size={12} /> Send Back
             </button>
             <button
               type="button"
               onClick={() => handleMoveLayer(selectedIds[0], "front")}
-              className="retro-button px-2 py-1 text-[9px] flex items-center gap-1"
-              title="Bring to Front"
+              className="genesis-button genesis-button-primary flex-1 h-8 text-[10px] font-semibold justify-center"
             >
-              <ArrowUpToLine className="w-3 h-3" /> Front
+              <ArrowUpToLine size={12} /> Bring Front
             </button>
           </div>
         )}
+      </div>
+
+      <div className="p-4 bg-white/40 border-t border-white/20 flex justify-between items-center text-[10px] font-medium text-zinc-400">
+        <span>{elements.length} elements</span>
       </div>
     </div>
   );

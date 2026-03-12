@@ -37,7 +37,7 @@ import { ExtensionMarketplace } from "./ExtensionMarketplace";
 import LayerManager from "./LayerManager";
 import SpaceManagerModal from "./SpaceManagerModal";
 import Taskbar from "./Taskbar";
-import { TutorialModal } from "./TutorialModal";
+import TutorialModal from "./TutorialModal";
 
 const CELL_SIZE = 14;
 const MIN_ZOOM = 0.5;
@@ -537,7 +537,17 @@ const AsciiEditor: React.FC = () => {
   }, [draw]);
 
   const handleMouseUp = useCallback(async () => {
-    if (isSelectingArea) {
+    const wasSelecting = isSelectingArea;
+    const wasDragging = hasDragged.current;
+    
+    // Reset UI states immediately for responsiveness
+    setIsDragging(false);
+    setIsResizing(false);
+    setDraggedPointIndex(null);
+    setIsPanning(false);
+    setIsSelectingArea(false);
+
+    if (wasSelecting) {
       const x1 = Math.min(selectionStart.x, selectionEnd.x);
       const y1 = Math.min(selectionStart.y, selectionEnd.y);
       const x2 = Math.max(selectionStart.x, selectionEnd.x);
@@ -561,7 +571,7 @@ const AsciiEditor: React.FC = () => {
       }
     }
 
-    if (hasDragged.current && space?.id) {
+    if (wasDragging && space?.id) {
       const movedIds = [...selectedIds, ...capturedIds];
       const updates = movedIds.map(id => {
         const el = elementsRef.current.find(e => e.id === id);
@@ -571,11 +581,7 @@ const AsciiEditor: React.FC = () => {
       await Promise.all(updates);
     }
 
-    setIsDragging(false);
-    setIsResizing(false);
-    setDraggedPointIndex(null);
-    setIsPanning(false);
-    setIsSelectingArea(false);
+    hasDragged.current = false;
     setCapturedIds([]);
   }, [isSelectingArea, selectionStart, selectionEnd, visualCellSize, viewOffset, space?.id, updateElementInDb, selectedIds, capturedIds]);
 
@@ -880,15 +886,29 @@ const AsciiEditor: React.FC = () => {
       draggedPointIndex,
     ],
   );
-  const handleTouchEnd = useCallback(() => {
+  const handleTouchEnd = useCallback(async () => {
+    const wasDragging = hasDragged.current;
+    
     setTouchDist(null);
     setIsDragging(false);
     setIsResizing(false);
     setDraggedPointIndex(null);
     setIsPanning(false);
     setIsSelectingArea(false);
+
+    if (wasDragging && space?.id) {
+      const movedIds = [...selectedIds, ...capturedIds];
+      const updates = movedIds.map(id => {
+        const el = elementsRef.current.find(e => e.id === id);
+        if (el) return updateElementInDb(id, el);
+        return Promise.resolve();
+      });
+      await Promise.all(updates);
+    }
+
+    hasDragged.current = false;
     setCapturedIds([]);
-  }, []);
+  }, [selectedIds, capturedIds, space?.id, updateElementInDb]);
 
   const handleTouchMove = useCallback(
     (e: TouchEvent) => {
@@ -1571,7 +1591,7 @@ const AsciiEditor: React.FC = () => {
         onDoubleClick={handleDoubleClick}
         onTouchStart={handleTouchStart}
         onContextMenu={handleContextMenu}
-        className={`fixed inset-x-0 top-16 bottom-8 w-full block bg-white ${
+        className={`fixed inset-0 w-full h-full block bg-[#f1f5f9] ${
           isPanning ? "cursor-grabbing" : spacePressed ? "cursor-grab" : "cursor-default"
         }`}
       />
@@ -1619,12 +1639,11 @@ const AsciiEditor: React.FC = () => {
       <div className="fixed top-4 left-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
         <div className="glass-surface rounded-2xl p-2 flex items-center justify-between shadow-2xl pointer-events-auto border-white/20">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-3 py-1 bg-[#000080]/10 rounded-xl text-[#000080]">
-              <Terminal size={16} />
-              <span className="font-bold text-xs tracking-tight">ascii_canva.genesis</span>
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl text-zinc-900">
+              <span className="font-bold text-xs tracking-tight">ascii_canva</span>
             </div>
 
-            <div className="h-6 w-px bg-zinc-300/50" />
+            <div className="h-6 w-px bg-zinc-200" />
 
             <div className="flex items-center gap-1">
               {/* File Actions */}
@@ -1677,13 +1696,19 @@ const AsciiEditor: React.FC = () => {
             
             <div className="h-6 w-px bg-zinc-300/50 mx-1" />
 
-            <button onClick={() => setShowExplorer(!showExplorer)} className="genesis-button h-8 px-3">
+            <button onClick={() => setShowExplorer(!showExplorer)} className="genesis-button h-8 px-3" title="Explorer">
               <Layers size={14} />
             </button>
-            <button onClick={() => setShowSpacesModal(true)} className="genesis-button h-8 px-3">
+            <button onClick={() => setShowTutorial(true)} className="genesis-button h-8 px-3" title="Tutorial">
+              <Book size={14} />
+            </button>
+            <Link href="/docs" target="_blank" className="genesis-button h-8 px-3" title="Documentation">
+              <Puzzle size={14} />
+            </Link>
+            <button onClick={() => setShowSpacesModal(true)} className="genesis-button h-8 px-3" title="Spaces">
               <Users size={14} />
             </button>
-            <button onClick={() => setShowApiKeyModal(true)} className="genesis-button h-8 px-3">
+            <button onClick={() => setShowApiKeyModal(true)} className="genesis-button h-8 px-3" title="API Keys">
               <Key size={14} />
             </button>
             
@@ -1836,6 +1861,7 @@ const AsciiEditor: React.FC = () => {
         onSwitchSpace={(slug) => {
           window.location.href = `${window.location.pathname}?join=${slug}`;
         }}
+        activeSpaceId={space?.id}
       />
 
       {showMarketplace && (
@@ -1867,7 +1893,7 @@ const AsciiEditor: React.FC = () => {
         }}
       />
 
-      <Taskbar />
+      <Taskbar status={status} />
     </div>
   );
 };
