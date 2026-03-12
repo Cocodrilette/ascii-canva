@@ -91,6 +91,7 @@ const AsciiEditor: React.FC = () => {
   const [showSpacesModal, setShowSpacesModal] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
   const [activeApiKey, setActiveApiKey] = useState<string | null>(null);
+  const [clipboard, setClipboard] = useState<BaseElement[]>([]);
 
   useEffect(() => {
     // Attempt to get an active API key for the current user
@@ -126,7 +127,9 @@ const AsciiEditor: React.FC = () => {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    elementId: string;
+    gridX: number;
+    gridY: number;
+    elementId: string | null;
     pointIndex?: number;
   } | null>(null);
 
@@ -198,17 +201,6 @@ const AsciiEditor: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
-        e.preventDefault();
-        undo();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo]);
-
-  useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code === "Space" && !isEditing) {
         // Only prevent if not typing in textarea
@@ -244,11 +236,13 @@ const AsciiEditor: React.FC = () => {
     [visualCellSize],
   );
 
+  const spaceRef = useRef<any>(null);
+
   const onRemoteData = useCallback(
     (remoteElements: BaseElement[]) => {
       // If we are in a persistent space, we only trust granular Postgres changes.
       // Broadcast is only for ephemeral/local collaboration.
-      if (space?.id) return;
+      if (spaceRef.current?.id) return;
 
       isRemoteUpdate.current = true;
 
@@ -319,6 +313,9 @@ const AsciiEditor: React.FC = () => {
     onElementDeleted
   );
 
+  useEffect(() => {
+    spaceRef.current = space;
+  }, [space]);
   // Load existing elements from DB when joining a space
   useEffect(() => {
     if (space?.id) {
@@ -631,6 +628,8 @@ const AsciiEditor: React.FC = () => {
               setContextMenu({
                 x: e.clientX,
                 y: e.clientY,
+                gridX,
+                gridY,
                 elementId: selected.id,
                 pointIndex: i,
               });
@@ -662,11 +661,19 @@ const AsciiEditor: React.FC = () => {
         setContextMenu({
           x: e.clientX,
           y: e.clientY,
+          gridX,
+          gridY,
           elementId: clickedEl.id,
         });
       } else {
-        setSelectedIds([]);
-        setContextMenu(null);
+        // Right click on background - no selection change unless needed
+        setContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          gridX,
+          gridY,
+          elementId: null,
+        });
       }
     },
     [elements, getGridCoords, selectedIds, visualCellSize, viewOffset],
@@ -1517,6 +1524,71 @@ const AsciiEditor: React.FC = () => {
     );
   };
 
+  const copySelected = useCallback(() => {
+    if (selectedIds.length === 0) return;
+    const selectedElements = elementsRef.current.filter((el) => selectedIds.includes(el.id));
+    setClipboard(JSON.parse(JSON.stringify(selectedElements)));
+    sileo.info({ title: "System", description: `${selectedElements.length} object(s) copied to clipboard.` });
+  }, [selectedIds]);
+
+  const paste = useCallback(async (targetX?: number, targetY?: number) => {
+    if (clipboard.length === 0) return;
+    
+    pushToHistory();
+    
+    let offsetX = 2;
+    let offsetY = 2;
+
+    if (targetX !== undefined && targetY !== undefined) {
+      // Calculate the bounding box of the clipboard elements
+      const bounds = clipboard.map(el => {
+        if (!hasExtension(el.type)) return { left: el.x, top: el.y };
+        return getExtension(el.type).getBounds(el);
+      });
+      
+      const minX = Math.min(...bounds.map(b => b.left));
+      const minY = Math.min(...bounds.map(b => b.top));
+      
+      offsetX = targetX - minX;
+      offsetY = targetY - minY;
+    }
+
+    const newElements: BaseElement[] = [];
+    const newIds: string[] = [];
+
+    for (const el of clipboard) {
+      if (!hasExtension(el.type)) continue;
+      const ext = getExtension(el.type);
+      
+      // Clean up metadata from copied element to create a fresh one
+      const { id: _, x, y, created_at, updated_at, space_id, created_by, isCenter, ...params } = el as any;
+      
+      const newEl = ext.create(x + offsetX, y + offsetY, params);
+      
+      if (space?.id) {
+        const res = await addElementToDb(newEl);
+        if (res?.data) {
+          const inflated = inflateElement(res.data);
+          newElements.push(inflated);
+          newIds.push(inflated.id);
+        }
+      } else {
+        newElements.push(newEl);
+        newIds.push(newEl.id);
+      }
+    }
+
+    if (newElements.length > 0) {
+      setElements((prev) => [...prev, ...newElements]);
+      setSelectedIds(newIds);
+      
+      // Update clipboard with new positions for subsequent "blind" pastes
+      setClipboard(newElements.map(el => JSON.parse(JSON.stringify(el))));
+      
+      sileo.success({ title: "System", description: `${newElements.length} object(s) materialized.` });
+    }
+  }, [clipboard, space?.id, addElementToDb, pushToHistory, inflateElement]);
+
   const deleteSelected = useCallback(
     async (id?: string) => {
       const targets = id ? [id] : selectedIds;
@@ -1534,6 +1606,38 @@ const AsciiEditor: React.FC = () => {
     },
     [selectedIds, pushToHistory, space?.id, deleteElementFromDb],
   );
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Global shortcuts should be disabled when editing text in our custom textarea
+      if (isEditing) return;
+
+      const isMod = e.ctrlKey || e.metaKey;
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+
+      if (isMod && e.key === "z") {
+        if (isInput) return;
+        e.preventDefault();
+        undo();
+      } else if (isMod && e.key === "c") {
+        if (isInput) return;
+        e.preventDefault();
+        copySelected();
+      } else if (isMod && e.key === "v") {
+        if (isInput) return;
+        e.preventDefault();
+        paste();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        // Only trigger delete if not in an input/textarea
+        if (isInput) return;
+        e.preventDefault();
+        deleteSelected();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, copySelected, paste, deleteSelected, isEditing]);
   const generateAscii = () => {
     if (elements.length === 0) return;
     const registeredElements = elements.filter(el => hasExtension(el.type));
@@ -1757,41 +1861,69 @@ const AsciiEditor: React.FC = () => {
 
       {contextMenu && (
         <div
-          className="fixed window-raised z-[110] shadow-[2px_2px_0_rgba(0,0,0,0.5)] p-[2px] min-w-[120px]"
+          className="fixed window-raised z-[110] shadow-[2px_2px_0_rgba(0,0,0,0.5)] p-[2px] min-w-[120px] bg-white"
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onMouseDown={(e) => e.stopPropagation()}
           role="menu"
         >
+          {contextMenu.elementId && (
+            <button
+              type="button"
+              onClick={() => {
+                copySelected();
+                closeContextMenu();
+              }}
+              className="w-full text-left px-4 py-1.5 text-[11px] font-bold text-zinc-700 hover:bg-zinc-100 flex items-center gap-2"
+            >
+              <Copy size={14} className="text-zinc-400" /> Copy
+            </button>
+          )}
+
+          {clipboard.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                paste(contextMenu.gridX, contextMenu.gridY);
+                closeContextMenu();
+              }}
+              className="w-full text-left px-4 py-1.5 text-[11px] font-bold text-zinc-700 hover:bg-zinc-100 flex items-center gap-2"
+            >
+              <FileText size={14} className="text-zinc-400" /> Paste
+            </button>
+          )}
+
+          {(contextMenu.elementId || clipboard.length > 0) && (
+            <div className="h-px bg-zinc-100 my-1 mx-1" />
+          )}
+
           {contextMenu.pointIndex !== undefined ? (
             <button
               type="button"
               onClick={() => {
                 deleteVectorPoint(
-                  contextMenu.elementId,
+                  contextMenu.elementId!,
                   contextMenu.pointIndex!,
                 );
                 closeContextMenu();
               }}
-              className="w-full text-left px-4 py-1 ui-label hover:bg-[var(--os-titlebar)] hover:text-white flex items-center gap-2"
+              className="w-full text-left px-4 py-1.5 text-[11px] font-bold text-red-500 hover:bg-red-50 flex items-center gap-2"
             >
-              <Trash2 className="w-3 h-3" /> Delete Point
+              <Trash2 size={14} /> Delete Point
             </button>
-          ) : (
+          ) : contextMenu.elementId ? (
             <button
               type="button"
               onClick={() => {
-                deleteSelected(contextMenu.elementId);
+                deleteSelected(contextMenu.elementId!);
                 closeContextMenu();
               }}
-              className="w-full text-left px-4 py-1 ui-label hover:bg-[var(--os-titlebar)] hover:text-white flex items-center gap-2"
+              className="w-full text-left px-4 py-1.5 text-[11px] font-bold text-red-500 hover:bg-red-50 flex items-center gap-2"
             >
-              {" "}
-              <Trash2 className="w-3 h-3" /> Delete
+              <Trash2 size={14} /> Delete
             </button>
-          )}
+          ) : null}
         </div>
       )}
-
       {showAscii && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-transparent">
           <div className="window-raised w-full max-w-2xl max-h-[80vh] flex flex-col shadow-[4px_4px_0_rgba(0,0,0,0.5)] m-4">
