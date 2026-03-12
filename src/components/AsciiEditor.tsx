@@ -75,6 +75,7 @@ const AsciiEditor: React.FC = () => {
   );
   const dragOffset = useRef({ x: 0, y: 0 });
   const [capturedIds, setCapturedIds] = useState<string[]>([]);
+  const mouseGridPos = useRef({ x: 0, y: 0 });
 
   const [isSelectingArea, setIsSelectingArea] = useState(false);
   const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
@@ -718,9 +719,9 @@ const AsciiEditor: React.FC = () => {
       const mouseY = e.clientY - rect.top;
 
       const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
+      mouseGridPos.current = { x: gridX, y: gridY };
 
-      if (isSelectingArea) {
-        setSelectionEnd({ x: e.clientX, y: e.clientY });
+      if (isSelectingArea) {        setSelectionEnd({ x: e.clientX, y: e.clientY });
         return;
       }
 
@@ -1536,21 +1537,28 @@ const AsciiEditor: React.FC = () => {
     
     pushToHistory();
     
-    let offsetX = 2;
-    let offsetY = 2;
+    let offsetX = 0;
+    let offsetY = 0;
 
     if (targetX !== undefined && targetY !== undefined) {
-      // Calculate the bounding box of the clipboard elements
+      // Calculate the bounding box of the clipboard elements to find the center
       const bounds = clipboard.map(el => {
-        if (!hasExtension(el.type)) return { left: el.x, top: el.y };
+        if (!hasExtension(el.type)) return { left: el.x, top: el.y, right: el.x + 1, bottom: el.y + 1 };
         return getExtension(el.type).getBounds(el);
       });
       
       const minX = Math.min(...bounds.map(b => b.left));
       const minY = Math.min(...bounds.map(b => b.top));
+      const maxX = Math.max(...bounds.map(b => b.right));
+      const maxY = Math.max(...bounds.map(b => b.bottom));
       
-      offsetX = targetX - minX;
-      offsetY = targetY - minY;
+      // Calculate the center of the group
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      
+      // Offset so the center of the group aligns with the target
+      offsetX = Math.round(targetX - centerX);
+      offsetY = Math.round(targetY - centerY);
     }
 
     const newElements: BaseElement[] = [];
@@ -1627,7 +1635,7 @@ const AsciiEditor: React.FC = () => {
       } else if (isMod && e.key === "v") {
         if (isInput) return;
         e.preventDefault();
-        paste();
+        paste(mouseGridPos.current.x, mouseGridPos.current.y);
       } else if (e.key === "Delete" || e.key === "Backspace") {
         // Only trigger delete if not in an input/textarea
         if (isInput) return;
