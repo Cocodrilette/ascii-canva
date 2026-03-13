@@ -19,6 +19,7 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sileo } from "sileo";
 import type { BoxElement } from "../extensions/builtin/box";
+import type { DiamondElement } from "../extensions/builtin/diamond";
 import type { LineElement } from "../extensions/builtin/line";
 import type { TextElement } from "../extensions/builtin/text";
 import type { VectorElement } from "../extensions/builtin/vector";
@@ -135,6 +136,7 @@ const AsciiEditor: React.FC = () => {
   } | null>(null);
 
   const getWelcomeElements = useCallback(() => {
+    const diamond = getExtension("diamond").create(55, 14, { size: 4 });
     return [
       // Title & Welcome
       { ...getExtension("text").create(10, 5, { text: "WELCOME TO ASCII_CANVA" }), isCenter: true },
@@ -156,6 +158,14 @@ const AsciiEditor: React.FC = () => {
       getExtension("box").create(70, 12, { width: 12, height: 5 }),
       getExtension("text").create(71, 13, { text: "Resizable" }),
       getExtension("text").create(71, 14, { text: "Containers" }),
+
+      // Diamond Example
+      diamond,
+      getExtension("line").create(55, 10, { 
+        points: [{ x: 55, y: 10 }, { x: 55, y: 14 }],
+        endElementId: diamond.id 
+      }),
+      getExtension("text").create(53, 19, { text: "Geometric Diamonds" }),
 
       // A little bit of "Art"
       getExtension("text").create(10, 24, { text: "  _   _  " }),

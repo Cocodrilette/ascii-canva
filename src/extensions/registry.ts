@@ -1,4 +1,5 @@
 import { boxExtension } from "./builtin/box";
+import { diamondExtension } from "./builtin/diamond";
 import { lineExtension } from "./builtin/line";
 import { textExtension } from "./builtin/text";
 import { vectorExtension } from "./builtin/vector";
@@ -10,6 +11,7 @@ class ExtensionRegistry {
     box: boxExtension,
     vector: vectorExtension,
     line: lineExtension,
+    diamond: diamondExtension,
   };
 
   register(extension: AsciiExtension<any, any>) {
