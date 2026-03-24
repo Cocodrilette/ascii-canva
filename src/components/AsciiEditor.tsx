@@ -136,43 +136,38 @@ const AsciiEditor: React.FC = () => {
   } | null>(null);
 
   const getWelcomeElements = useCallback(() => {
-    const diamond = getExtension("diamond").create(55, 14, { size: 4 });
     return [
-      // Title & Welcome
-      { ...getExtension("text").create(10, 5, { text: "WELCOME TO ASCII_CANVA" }), isCenter: true },
-      getExtension("text").create(10, 7, { text: "A simple, collaborative ASCII workspace." }),
+      // Main Hero Section
+      { 
+        ...getExtension("text").create(0, -2, { text: "▲ ASCII_CANVA" }), 
+        isCenter: true 
+      },
+      getExtension("text").create(-16, 0, { text: "THE GENESIS STANDARD FOR COLLABORATIVE ART" }),
       
-      // Quick Instructions
-      getExtension("box").create(10, 10, { width: 38, height: 10 }),
-      getExtension("text").create(12, 11, { text: "QUICK START GUIDE:" }),
-      getExtension("text").create(12, 13, { text: "• Click tools above to add objects" }),
-      getExtension("text").create(12, 14, { text: "• Drag objects to move them" }),
-      getExtension("text").create(12, 15, { text: "• Double-click text to edit" }),
-      getExtension("text").create(12, 16, { text: "• Right-click for context menu" }),
-      getExtension("text").create(12, 17, { text: "• Use 'Export' to get .txt art" }),
-
-      // Examples Area
-      getExtension("text").create(50, 10, { text: "EXTENSIBLE PRIMITIVES:" }),
+      // Main Frame
+      getExtension("box").create(-25, -6, { width: 51, height: 10 }),
       
-      // Box Example
-      getExtension("box").create(70, 12, { width: 12, height: 5 }),
-      getExtension("text").create(71, 13, { text: "Resizable" }),
-      getExtension("text").create(71, 14, { text: "Containers" }),
+      // Features Row
+      getExtension("text").create(-22, 6, { text: "● COLLABORATIVE" }),
+      getExtension("text").create(-2, 6, { text: "● EXTENSIBLE" }),
+      getExtension("text").create(15, 6, { text: "● AI-POWERED" }),
+      
+      // Quick Start Guide
+      getExtension("box").create(-25, 9, { width: 30, height: 8 }),
+      getExtension("text").create(-22, 10, { text: "COMMAND_SEQUENCE:" }),
+      getExtension("text").create(-22, 12, { text: "• Triple-Click -> New Text" }),
+      getExtension("text").create(-22, 13, { text: "• Right-Click  -> Insert" }),
+      getExtension("text").create(-22, 14, { text: "• Drag Object  -> Move" }),
+      getExtension("text").create(-22, 15, { text: "• Scroll+Ctrl  -> Zoom" }),
 
-      // Diamond Example
-      diamond,
-      getExtension("line").create(55, 10, { 
-        points: [{ x: 55, y: 10 }, { x: 55, y: 14 }],
-        endElementId: diamond.id 
-      }),
-      getExtension("text").create(53, 19, { text: "Geometric Diamonds" }),
-
-      // A little bit of "Art"
-      getExtension("text").create(10, 24, { text: "  _   _  " }),
-      getExtension("text").create(10, 25, { text: " ( ) ( ) " }),
-      getExtension("text").create(10, 26, { text: "  \\_ _/  " }),
-      getExtension("text").create(10, 27, { text: "    V    " }),
-      getExtension("text").create(14, 25, { text: "<-- Simple ASCII Art" }),
+      // Primitives Preview
+      getExtension("text").create(10, 9, { text: "GEOMETRY_ENGINE:" }),
+      getExtension("diamond").create(14, 13, { size: 3 }),
+      getExtension("box").create(24, 12, { width: 10, height: 4 }),
+      getExtension("line").create(17, 13, { points: [{x: 17, y: 13}, {x: 24, y: 13}] }),
+      
+      // Footer
+      getExtension("text").create(-12, 19, { text: "V0.34.0 // STANDING BY FOR INPUT" }),
     ];
   }, []);
 
