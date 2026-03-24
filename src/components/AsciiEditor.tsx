@@ -1169,6 +1169,16 @@ const AsciiEditor: React.FC = () => {
 
     const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
     
+    // Triple click to create new text element
+    if (e.detail === 3) {
+      addElement("text", gridX, gridY, { text: "" }).then((el) => {
+        if (el) {
+          setIsEditing(true);
+        }
+      });
+      return;
+    }
+
     // Only allow resizing/point dragging if exactly one element is selected
     if (selectedIds.length === 1) {
       const selected = elements.find((el) => el.id === selectedIds[0]);
@@ -1387,20 +1397,25 @@ const AsciiEditor: React.FC = () => {
     }
   };
 
-  const addExtensionElement = async (type: string) => {
+  const addElement = useCallback(async (type: string, x?: number, y?: number, params?: any) => {
     if (elements.length >= 100) {
       sileo.error({
         title: "System Capacity Reached",
         description: "Maximum 100 neural objects allowed per sector."
       });
-      return;
+      return null;
     }
     pushToHistory();
     const ext = getExtension(type);
+    
+    // Default position: center of view
+    const posX = x ?? Math.floor((window.innerWidth / 2 - viewOffset.x) / visualCellSize);
+    const posY = y ?? Math.floor((window.innerHeight / 2 - viewOffset.y) / visualCellSize);
+    
     const newEl = ext.create(
-      Math.floor((window.innerWidth / 2 - viewOffset.x) / visualCellSize),
-      Math.floor((window.innerHeight / 2 - viewOffset.y) / visualCellSize),
-      type === "text" ? { text: newText.trim() || "NEW TEXT" } : {},
+      posX,
+      posY,
+      params || (type === "text" ? { text: newText.trim() || "NEW TEXT" } : {}),
     );
 
     // Persistence: Add to DB if in a space
@@ -1410,25 +1425,26 @@ const AsciiEditor: React.FC = () => {
         const { data, error } = res;
         if (error) {
           sileo.error({ title: "Registration Failure", description: error.message });
+          return null;
         } else if (data) {
-          // useRealtime will trigger onElementCreated, which adds it to local state.
-          // We don't necessarily need to add it here, but for "optimistic" UI we could.
-          // However, to avoid duplicates, let's just wait for the realtime event or add it if not already there.
           const inflated = inflateElement(data);
           setElements(prev => {
             if (prev.find(e => e.id === inflated.id)) return prev;
             return [...prev, inflated];
           });
           setSelectedIds([inflated.id]);
+          return inflated;
         }
       }
     } else {
       setElements(prev => [...prev, newEl]);
       setSelectedIds([newEl.id]);
+      return newEl;
     }
     
     setNewText("");
-  };
+    return null;
+  }, [elements.length, pushToHistory, viewOffset, visualCellSize, newText, space?.id, addElementToDb, inflateElement]);
 
   const saveProject = () => {
     try {
@@ -1796,7 +1812,7 @@ const AsciiEditor: React.FC = () => {
                   <button
                     key={ext.type}
                     type="button"
-                    onClick={() => addExtensionElement(ext.type)}
+                    onClick={() => addElement(ext.type)}
                     className="genesis-button h-8 px-3"
                     title={`Add ${ext.label}`}
                   >
@@ -1879,11 +1895,44 @@ const AsciiEditor: React.FC = () => {
 
       {contextMenu && (
         <div
-          className="fixed window-raised z-[110] shadow-[2px_2px_0_rgba(0,0,0,0.5)] p-[2px] min-w-[120px] bg-white"
+          className="fixed bg-white/80 z-110 min-w-[160px] rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200"
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onMouseDown={(e) => e.stopPropagation()}
           role="menu"
         >
+          <div className="relative group/insert p-1">
+            <button
+              type="button"
+              className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center justify-between gap-3 transition-colors group"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                  <Puzzle size={14} className="text-zinc-500 group-hover:text-blue-600" />
+                </div>
+                Insert
+              </div>
+              <span className="text-[10px] text-zinc-400 opacity-50">▶</span>
+            </button>
+            <div className="absolute left-[calc(100%+4px)] top-0 p-1 bg-white/90 backdrop-blur-2xl  min-w-[140px] rounded-2xl shadow-2xl hidden group-hover/insert:block animate-in fade-in slide-in-from-left-2 duration-200">
+              {getAllExtensions().map((ext) => (
+                <button
+                  key={ext.type}
+                  type="button"
+                  onClick={() => {
+                    addElement(ext.type, contextMenu.gridX, contextMenu.gridY);
+                    closeContextMenu();
+                  }}
+                  className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-2.5 transition-colors group"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                    <ext.icon size={14} className="text-zinc-500 group-hover:text-blue-600" />
+                  </div>
+                  {ext.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {contextMenu.elementId && (
             <button
               type="button"
@@ -1891,9 +1940,12 @@ const AsciiEditor: React.FC = () => {
                 copySelected();
                 closeContextMenu();
               }}
-              className="w-full text-left px-4 py-1.5 text-[11px] font-bold text-zinc-700 hover:bg-zinc-100 flex items-center gap-2"
+              className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-2.5 transition-colors group"
             >
-              <Copy size={14} className="text-zinc-400" /> Copy
+              <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                <Copy size={14} className="text-zinc-500 group-hover:text-blue-600" />
+              </div>
+              Copy
             </button>
           )}
 
@@ -1904,14 +1956,17 @@ const AsciiEditor: React.FC = () => {
                 paste(contextMenu.gridX, contextMenu.gridY);
                 closeContextMenu();
               }}
-              className="w-full text-left px-4 py-1.5 text-[11px] font-bold text-zinc-700 hover:bg-zinc-100 flex items-center gap-2"
+              className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-2.5 transition-colors group"
             >
-              <FileText size={14} className="text-zinc-400" /> Paste
+              <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                <FileText size={14} className="text-zinc-500 group-hover:text-blue-600" />
+              </div>
+              Paste
             </button>
           )}
 
           {(contextMenu.elementId || clipboard.length > 0) && (
-            <div className="h-px bg-zinc-100 my-1 mx-1" />
+            <div className="h-px bg-zinc-200/50 my-1.5 mx-1" />
           )}
 
           {contextMenu.pointIndex !== undefined ? (
@@ -1924,9 +1979,12 @@ const AsciiEditor: React.FC = () => {
                 );
                 closeContextMenu();
               }}
-              className="w-full text-left px-4 py-1.5 text-[11px] font-bold text-red-500 hover:bg-red-50 flex items-center gap-2"
+              className="w-full text-left px-3 py-2 text-[12px] font-semibold text-red-500 hover:bg-red-50 rounded-xl flex items-center gap-2.5 transition-colors group"
             >
-              <Trash2 size={14} /> Delete Point
+              <div className="w-6 h-6 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                <Trash2 size={14} className="text-red-400 group-hover:text-red-600" />
+              </div>
+              Delete Point
             </button>
           ) : contextMenu.elementId ? (
             <button
@@ -1935,15 +1993,18 @@ const AsciiEditor: React.FC = () => {
                 deleteSelected(contextMenu.elementId!);
                 closeContextMenu();
               }}
-              className="w-full text-left px-4 py-1.5 text-[11px] font-bold text-red-500 hover:bg-red-50 flex items-center gap-2"
+              className="w-full text-left px-3 py-2 text-[12px] font-semibold text-red-500 hover:bg-red-50 rounded-xl flex items-center gap-2.5 transition-colors group"
             >
-              <Trash2 size={14} /> Delete
+              <div className="w-6 h-6 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                <Trash2 size={14} className="text-red-400 group-hover:text-red-600" />
+              </div>
+              Delete
             </button>
           ) : null}
         </div>
       )}
       {showAscii && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-transparent">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-transparent">
           <div className="window-raised w-full max-w-2xl max-h-[80vh] flex flex-col shadow-[4px_4px_0_rgba(0,0,0,0.5)] m-4">
             <div className="title-bar cursor-default">
               <span className="flex items-center gap-2 font-bold">
