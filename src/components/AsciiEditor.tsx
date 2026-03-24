@@ -1906,12 +1906,12 @@ const AsciiEditor: React.FC = () => {
 
       {contextMenu && (
         <div
-          className="fixed bg-white/80 z-110 min-w-[160px] rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+          className="fixed p-1 bg-white/80 z-110 min-w-[160px] rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200"
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onMouseDown={(e) => e.stopPropagation()}
           role="menu"
         >
-          <div className="relative group/insert p-1">
+          <div className="relative group/insert">
             <button
               type="button"
               className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center justify-between gap-3 transition-colors group"
@@ -1944,7 +1944,8 @@ const AsciiEditor: React.FC = () => {
             </div>
           </div>
 
-          <button
+          {/* @NOTE: We will test if this is needed */}
+          {/* <button
             type="button"
             onClick={() => {
               exportToImage();
@@ -1956,9 +1957,7 @@ const AsciiEditor: React.FC = () => {
               <Download size={14} className="text-zinc-500 group-hover:text-blue-600" />
             </div>
             Export Image
-          </button>
-
-          <div className="h-px bg-zinc-200/50 my-1.5 mx-1" />
+          </button> */}
 
           {contextMenu.elementId && (
             <button
