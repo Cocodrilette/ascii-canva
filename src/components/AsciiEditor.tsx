@@ -527,15 +527,17 @@ const AsciiEditor: React.FC = () => {
 
     ctx.save();
     ctx.scale(dpr, dpr);
+
+    ctx.save();
     ctx.translate(viewOffset.x, viewOffset.y);
 
     // Grid
     ctx.strokeStyle = "#F0F0F0";
     ctx.lineWidth = 1;
     const startCol = Math.floor(-viewOffset.x / visualCellSize);
-    const endCol = startCol + Math.ceil(canvas.width / visualCellSize) + 1;
+    const endCol = startCol + Math.ceil(canvas.width / (visualCellSize * dpr)) + 1;
     const startRow = Math.floor(-viewOffset.y / visualCellSize);
-    const endRow = startRow + Math.ceil(canvas.height / visualCellSize) + 1;
+    const endRow = startRow + Math.ceil(canvas.height / (visualCellSize * dpr)) + 1;
 
     ctx.beginPath();
     for (let i = startCol; i <= endCol; i++) {
@@ -559,9 +561,9 @@ const AsciiEditor: React.FC = () => {
       const screenH = (b.bottom - b.top) * visualCellSize;
       return (
         screenX + screenW > 0 &&
-        screenX < canvas.width &&
+        screenX < canvas.width / dpr &&
         screenY + screenH > 0 &&
-        screenY < canvas.height
+        screenY < canvas.height / dpr
       );
     });
 
@@ -569,24 +571,25 @@ const AsciiEditor: React.FC = () => {
       const ext = getExtension(el.type);
       ext.render(ctx, el, selectedIds.includes(el.id), visualCellSize);
     }
+    ctx.restore();
 
     // Draw selection marquee
     if (isSelectingArea) {
-      ctx.restore(); // Exit grid coordinate space for pixel-based marquee
       ctx.save();
       ctx.strokeStyle = "#000080";
       ctx.setLineDash([2, 2]);
       ctx.lineWidth = 1;
       ctx.fillStyle = "rgba(0, 0, 128, 0.1)";
-      const x = Math.min(selectionStart.x, selectionEnd.x);
-      const y = Math.min(selectionStart.y, selectionEnd.y);
+      
+      const canvasRect = canvas.getBoundingClientRect();
+      const x = Math.min(selectionStart.x, selectionEnd.x) - canvasRect.left;
+      const y = Math.min(selectionStart.y, selectionEnd.y) - canvasRect.top;
       const w = Math.abs(selectionStart.x - selectionEnd.x);
       const h = Math.abs(selectionStart.y - selectionEnd.y);
+      
       ctx.fillRect(x, y, w, h);
       ctx.strokeRect(x, y, w, h);
       ctx.restore();
-      ctx.save();
-      ctx.translate(viewOffset.x, viewOffset.y);
     }
 
     ctx.restore();
