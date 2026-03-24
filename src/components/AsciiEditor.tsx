@@ -44,6 +44,26 @@ const CELL_SIZE = 14;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4.0;
 
+/**
+ * Helper to calculate centered text position inside a box/element
+ */
+const getCenteredTextPos = (
+  text: string,
+  boxX: number,
+  boxY: number,
+  boxWidth: number,
+  boxHeight: number,
+) => {
+  const lines = text.split("\n");
+  const textHeight = lines.length;
+  const maxLineWidth = Math.max(...lines.map((l) => l.length));
+
+  const x = Math.floor(boxX + (boxWidth - maxLineWidth) / 2);
+  const y = Math.floor(boxY + (boxHeight - textHeight) / 2);
+
+  return { x, y };
+};
+
 const AsciiEditor: React.FC = () => {
   const { loading: extensionsLoading, autoInstallByTypes } = useExtensions();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -136,39 +156,70 @@ const AsciiEditor: React.FC = () => {
   } | null>(null);
 
   const getWelcomeElements = useCallback(() => {
-    return [
-      // Main Hero Section
-      { 
-        ...getExtension("text").create(0, -2, { text: "▲ ASCII_CANVA" }), 
-        isCenter: true 
-      },
-      getExtension("text").create(-16, 0, { text: "THE GENESIS STANDARD FOR COLLABORATIVE ART" }),
-      
-      // Main Frame
-      getExtension("box").create(-25, -6, { width: 51, height: 10 }),
-      
-      // Features Row
-      getExtension("text").create(-22, 6, { text: "● COLLABORATIVE" }),
-      getExtension("text").create(-2, 6, { text: "● EXTENSIBLE" }),
-      getExtension("text").create(15, 6, { text: "● AI-POWERED" }),
-      
-      // Quick Start Guide
-      getExtension("box").create(-25, 9, { width: 30, height: 8 }),
-      getExtension("text").create(-22, 10, { text: "COMMAND_SEQUENCE:" }),
-      getExtension("text").create(-22, 12, { text: "• Triple-Click -> New Text" }),
-      getExtension("text").create(-22, 13, { text: "• Right-Click  -> Insert" }),
-      getExtension("text").create(-22, 14, { text: "• Drag Object  -> Move" }),
-      getExtension("text").create(-22, 15, { text: "• Scroll+Ctrl  -> Zoom" }),
+    const elements: BaseElement[] = [];
 
-      // Primitives Preview
-      getExtension("text").create(10, 9, { text: "GEOMETRY_ENGINE:" }),
-      getExtension("diamond").create(14, 13, { size: 3 }),
-      getExtension("box").create(24, 12, { width: 10, height: 4 }),
-      getExtension("line").create(17, 13, { points: [{x: 17, y: 13}, {x: 24, y: 13}] }),
-      
-      // Footer
-      getExtension("text").create(-12, 19, { text: "V0.34.0 // STANDING BY FOR INPUT" }),
-    ];
+    // 1. Header Hero
+    const headerBox = { x: -30, y: -20, w: 60, h: 8 };
+    elements.push(getExtension("box").create(headerBox.x, headerBox.y, { width: headerBox.w, height: headerBox.h }));
+    
+    const titleText = "▲ GENESIS_OS: ASCII_CANVA_V4\nCOLLABORATIVE DESIGN PROTOCOL";
+    const titlePos = getCenteredTextPos(titleText, headerBox.x, headerBox.y, headerBox.w, headerBox.h);
+    elements.push({ 
+      ...getExtension("text").create(titlePos.x, titlePos.y, { text: titleText }),
+      isCenter: true 
+    });
+
+    // 2. Main Logic Flow (Vertical)
+    
+    // Start Node
+    const startBox = { x: -8, y: -10, w: 16, h: 5 };
+    elements.push(getExtension("box").create(startBox.x, startBox.y, { width: startBox.w, height: startBox.h }));
+    const startText = "INITIALIZE\nCANVAS";
+    const startTextPos = getCenteredTextPos(startText, startBox.x, startBox.y, startBox.w, startBox.h);
+    elements.push(getExtension("text").create(startTextPos.x, startTextPos.y, { text: startText }));
+
+    // Connector 1
+    elements.push(getExtension("line").create(0, -5, { points: [{x: 0, y: -5}, {x: 0, y: -2}] }));
+
+    // Decision Node
+    const decisionDiamond = getExtension("diamond").create(0, 2, { size: 4 });
+    elements.push(decisionDiamond);
+    elements.push(getExtension("text").create(-10, 1, { text: "COLLAB\nACTIVE?" }));
+
+    // Branch Left: No
+    elements.push(getExtension("line").create(-4, 2, { points: [{x: -4, y: 2}, {x: -20, y: 2}, {x: -20, y: 6}] }));
+    const localBox = { x: -28, y: 6, w: 16, h: 5 };
+    elements.push(getExtension("box").create(localBox.x, localBox.y, { width: localBox.w, height: localBox.h }));
+    const localText = "LOCAL_BUFFER\nMODE";
+    const localTextPos = getCenteredTextPos(localText, localBox.x, localBox.y, localBox.w, localBox.h);
+    elements.push(getExtension("text").create(localTextPos.x, localTextPos.y, { text: localText }));
+
+    // Branch Right: Yes
+    elements.push(getExtension("line").create(4, 2, { points: [{x: 4, y: 2}, {x: 20, y: 2}, {x: 20, y: 6}] }));
+    const p2pBox = { x: 12, y: 6, w: 16, h: 5 };
+    elements.push(getExtension("box").create(p2pBox.x, p2pBox.y, { width: p2pBox.w, height: p2pBox.h }));
+    const p2pText = "REALTIME_P2P\nSYNC";
+    const p2pTextPos = getCenteredTextPos(p2pText, p2pBox.x, p2pBox.y, p2pBox.w, p2pBox.h);
+    elements.push(getExtension("text").create(p2pTextPos.x, p2pTextPos.y, { text: p2pText }));
+
+    // Rejoin Flow
+    elements.push(getExtension("line").create(-20, 11, { points: [{x: -20, y: 11}, {x: -20, y: 14}, {x: -8, y: 14}] }));
+    elements.push(getExtension("line").create(20, 11, { points: [{x: 20, y: 11}, {x: 20, y: 14}, {x: 8, y: 14}] }));
+
+    // Final Node
+    const endBox = { x: -8, y: 14, w: 16, h: 5 };
+    elements.push(getExtension("box").create(endBox.x, endBox.y, { width: endBox.w, height: endBox.h }));
+    const endText = "RENDER_ART\nCOMPLETE";
+    const endTextPos = getCenteredTextPos(endText, endBox.x, endBox.y, endBox.w, endBox.h);
+    elements.push(getExtension("text").create(endTextPos.x, endTextPos.y, { text: endText }));
+
+    // Decorative Elements
+    elements.push(getExtension("vector").create(-35, -25, { points: [{x: -35, y: -25}, {x: 35, y: -25}] }));
+    elements.push(getExtension("vector").create(-35, 25, { points: [{x: -35, y: 25}, {x: 35, y: 25}] }));
+    elements.push(getExtension("text").create(-35, 26, { text: "SYS_STATUS: READY" }));
+    elements.push(getExtension("text").create(20, 26, { text: "LOC: 0xGENESIS" }));
+
+    return elements;
   }, []);
 
   const visualCellSize = CELL_SIZE * zoom;
