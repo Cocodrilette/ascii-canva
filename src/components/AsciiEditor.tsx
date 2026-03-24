@@ -779,16 +779,18 @@ const AsciiEditor: React.FC = () => {
               let hitId: string | undefined;
 
               if (isStart || isEnd) {
-                const hit = prev.find(
-                  (other) =>
-                    !selectedIds.includes(other.id) &&
-                    other.type !== "vector" &&
-                    other.type !== "line" &&
-                    gridX >= getExtension(other.type).getBounds(other).left &&
-                    gridX < getExtension(other.type).getBounds(other).right &&
-                    gridY >= getExtension(other.type).getBounds(other).top &&
-                    gridY < getExtension(other.type).getBounds(other).bottom,
-                );
+                const hit = [...prev]
+                  .reverse()
+                  .find(
+                    (other) =>
+                      !selectedIds.includes(other.id) &&
+                      other.type !== "vector" &&
+                      other.type !== "line" &&
+                      gridX >= getExtension(other.type).getBounds(other).left &&
+                      gridX < getExtension(other.type).getBounds(other).right &&
+                      gridY >= getExtension(other.type).getBounds(other).top &&
+                      gridY < getExtension(other.type).getBounds(other).bottom,
+                  );
 
                 if (hit) {
                   hitId = hit.id;
@@ -995,16 +997,18 @@ const AsciiEditor: React.FC = () => {
                 let hitId: string | undefined;
 
                 if (isStart || isEnd) {
-                  const hit = prev.find(
-                    (other) =>
-                      !selectedIds.includes(other.id) &&
-                      other.type !== "vector" &&
-                      other.type !== "line" &&
-                      gridX >= getExtension(other.type).getBounds(other).left &&
-                      gridX < getExtension(other.type).getBounds(other).right &&
-                      gridY >= getExtension(other.type).getBounds(other).top &&
-                      gridY < getExtension(other.type).getBounds(other).bottom,
-                  );
+                  const hit = [...prev]
+                    .reverse()
+                    .find(
+                      (other) =>
+                        !selectedIds.includes(other.id) &&
+                        other.type !== "vector" &&
+                        other.type !== "line" &&
+                        gridX >= getExtension(other.type).getBounds(other).left &&
+                        gridX < getExtension(other.type).getBounds(other).right &&
+                        gridY >= getExtension(other.type).getBounds(other).top &&
+                        gridY < getExtension(other.type).getBounds(other).bottom,
+                    );
 
                   if (hit) {
                     hitId = hit.id;
@@ -1804,6 +1808,13 @@ const AsciiEditor: React.FC = () => {
                 >
                   Export ASCII
                 </button>
+                <button
+                  type="button"
+                  onClick={exportToImage}
+                  className="genesis-button h-8 px-3 text-[11px]"
+                >
+                  Export Image
+                </button>
               </div>
 
               {/* Tools */}
@@ -1932,6 +1943,22 @@ const AsciiEditor: React.FC = () => {
               ))}
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              exportToImage();
+              closeContextMenu();
+            }}
+            className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-2.5 transition-colors group"
+          >
+            <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+              <Download size={14} className="text-zinc-500 group-hover:text-blue-600" />
+            </div>
+            Export Image
+          </button>
+
+          <div className="h-px bg-zinc-200/50 my-1.5 mx-1" />
 
           {contextMenu.elementId && (
             <button
