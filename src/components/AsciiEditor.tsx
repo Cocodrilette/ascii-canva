@@ -23,12 +23,15 @@ import type { DiamondElement } from "../extensions/builtin/diamond";
 import type { LineElement } from "../extensions/builtin/line";
 import type { TextElement } from "../extensions/builtin/text";
 import type { VectorElement } from "../extensions/builtin/vector";
-import { getAllExtensions, getExtension, hasExtension } from "../extensions/registry";
+import {
+  getAllExtensions,
+  getExtension,
+  hasExtension,
+} from "../extensions/registry";
 import type { BaseElement } from "../extensions/types";
-import { supabase } from "../lib/supabase";
 import { useExtensions } from "../hooks/useExtensions";
-
 import { useRealtime } from "../hooks/useRealtime";
+import { supabase } from "../lib/supabase";
 import { isInside } from "../utils/geometry";
 // Removed packElements and unpackElements imports as we use JSON now
 import AiChat from "./AiChat";
@@ -69,15 +72,15 @@ const AsciiEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [elements, setElements] = useState<BaseElement[]>([]);
   const elementsRef = useRef<BaseElement[]>(elements);
-  
+
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
-  
+
   // Auto-install missing extensions when elements update (especially on remote sync)
   useEffect(() => {
     if (elements.length > 0 && !extensionsLoading) {
-      const types = Array.from(new Set(elements.map(el => el.type)));
+      const types = Array.from(new Set(elements.map((el) => el.type)));
       autoInstallByTypes(types);
     }
   }, [elements, extensionsLoading, autoInstallByTypes]);
@@ -118,7 +121,9 @@ const AsciiEditor: React.FC = () => {
   useEffect(() => {
     // Attempt to get an active API key for the current user
     const fetchActiveKey = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("api_keys")
@@ -155,83 +160,6 @@ const AsciiEditor: React.FC = () => {
     pointIndex?: number;
   } | null>(null);
 
-  const getWelcomeElements = useCallback(() => {
-    const elements: BaseElement[] = [];
-
-    // 1. Header Hero
-    const headerBox = { x: -30, y: -20, w: 60, h: 8 };
-    elements.push(getExtension("box").create(headerBox.x, headerBox.y, { width: headerBox.w, height: headerBox.h }));
-    
-    const titleText = "▲ GENESIS_OS: ASCII_CANVA_V4\nCOLLABORATIVE DESIGN PROTOCOL";
-    const titlePos = getCenteredTextPos(titleText, headerBox.x, headerBox.y, headerBox.w, headerBox.h);
-    elements.push({ 
-      ...getExtension("text").create(titlePos.x, titlePos.y, { text: titleText }),
-      isCenter: true 
-    });
-
-    // 2. Main Logic Flow (Vertical)
-    
-    // Start Node
-    const startBox = { x: -8, y: -10, w: 16, h: 5 };
-    elements.push(getExtension("box").create(startBox.x, startBox.y, { width: startBox.w, height: startBox.h }));
-    const startText = "INITIALIZE\nCANVAS";
-    const startTextPos = getCenteredTextPos(startText, startBox.x, startBox.y, startBox.w, startBox.h);
-    elements.push(getExtension("text").create(startTextPos.x, startTextPos.y, { text: startText }));
-
-    // Connector 1
-    elements.push(getExtension("line").create(0, -5, { points: [{x: 0, y: -5}, {x: 0, y: -2}] }));
-
-    // Decision Node
-    const diamondSize = 6;
-    const decisionDiamond = getExtension("diamond").create(0, 2, { size: diamondSize });
-    elements.push(decisionDiamond);
-    
-    const decisionText = "COLLAB\nACTIVE?";
-    const diamondBox = { 
-      x: decisionDiamond.x - diamondSize, 
-      y: decisionDiamond.y - diamondSize, 
-      w: diamondSize * 2 + 1, 
-      h: diamondSize * 2 + 1 
-    };
-    const decisionTextPos = getCenteredTextPos(decisionText, diamondBox.x, diamondBox.y, diamondBox.w, diamondBox.h);
-    elements.push(getExtension("text").create(decisionTextPos.x, decisionTextPos.y, { text: decisionText }));
-
-    // Branch Left: No
-    elements.push(getExtension("line").create(-4, 2, { points: [{x: -4, y: 2}, {x: -20, y: 2}, {x: -20, y: 6}] }));
-    const localBox = { x: -28, y: 6, w: 16, h: 5 };
-    elements.push(getExtension("box").create(localBox.x, localBox.y, { width: localBox.w, height: localBox.h }));
-    const localText = "LOCAL_BUFFER\nMODE";
-    const localTextPos = getCenteredTextPos(localText, localBox.x, localBox.y, localBox.w, localBox.h);
-    elements.push(getExtension("text").create(localTextPos.x, localTextPos.y, { text: localText }));
-
-    // Branch Right: Yes
-    elements.push(getExtension("line").create(4, 2, { points: [{x: 4, y: 2}, {x: 20, y: 2}, {x: 20, y: 6}] }));
-    const p2pBox = { x: 12, y: 6, w: 16, h: 5 };
-    elements.push(getExtension("box").create(p2pBox.x, p2pBox.y, { width: p2pBox.w, height: p2pBox.h }));
-    const p2pText = "REALTIME_P2P\nSYNC";
-    const p2pTextPos = getCenteredTextPos(p2pText, p2pBox.x, p2pBox.y, p2pBox.w, p2pBox.h);
-    elements.push(getExtension("text").create(p2pTextPos.x, p2pTextPos.y, { text: p2pText }));
-
-    // Rejoin Flow
-    elements.push(getExtension("line").create(-20, 11, { points: [{x: -20, y: 11}, {x: -20, y: 14}, {x: -8, y: 14}] }));
-    elements.push(getExtension("line").create(20, 11, { points: [{x: 20, y: 11}, {x: 20, y: 14}, {x: 8, y: 14}] }));
-
-    // Final Node
-    const endBox = { x: -8, y: 14, w: 16, h: 5 };
-    elements.push(getExtension("box").create(endBox.x, endBox.y, { width: endBox.w, height: endBox.h }));
-    const endText = "RENDER_ART\nCOMPLETE";
-    const endTextPos = getCenteredTextPos(endText, endBox.x, endBox.y, endBox.w, endBox.h);
-    elements.push(getExtension("text").create(endTextPos.x, endTextPos.y, { text: endText }));
-
-    // Decorative Elements
-    elements.push(getExtension("vector").create(-35, -25, { points: [{x: -35, y: -25}, {x: 35, y: -25}] }));
-    elements.push(getExtension("vector").create(-35, 25, { points: [{x: -35, y: 25}, {x: 35, y: 25}] }));
-    elements.push(getExtension("text").create(-35, 26, { text: "SYS_STATUS: READY" }));
-    elements.push(getExtension("text").create(20, 26, { text: "LOC: 0xGENESIS" }));
-
-    return elements;
-  }, []);
-
   const visualCellSize = CELL_SIZE * zoom;
 
   const getGridCoords = useCallback(
@@ -239,8 +167,12 @@ const AsciiEditor: React.FC = () => {
       const canvas = canvasRef.current;
       if (!canvas) return { x: 0, y: 0 };
       const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((clientX - rect.left - viewOffset.x) / visualCellSize);
-      const y = Math.floor((clientY - rect.top - viewOffset.y) / visualCellSize);
+      const x = Math.floor(
+        (clientX - rect.left - viewOffset.x) / visualCellSize,
+      );
+      const y = Math.floor(
+        (clientY - rect.top - viewOffset.y) / visualCellSize,
+      );
       return { x, y };
     },
     [viewOffset, visualCellSize],
@@ -271,7 +203,10 @@ const AsciiEditor: React.FC = () => {
     const down = (e: KeyboardEvent) => {
       if (e.code === "Space" && !isEditing) {
         // Only prevent if not typing in textarea
-        if (document.activeElement?.tagName !== "TEXTAREA" && document.activeElement?.tagName !== "INPUT") {
+        if (
+          document.activeElement?.tagName !== "TEXTAREA" &&
+          document.activeElement?.tagName !== "INPUT"
+        ) {
           e.preventDefault();
           setSpacePressed(true);
         }
@@ -336,48 +271,62 @@ const AsciiEditor: React.FC = () => {
 
   const inflateElement = useCallback((el: any) => {
     const flattened = { ...el, ...el.params };
-    if ((flattened.type === "vector" || flattened.type === "line") && !flattened.points) {
+    if (
+      (flattened.type === "vector" || flattened.type === "line") &&
+      !flattened.points
+    ) {
       flattened.points = [
         { x: flattened.x, y: flattened.y },
-        { x: flattened.x2 ?? flattened.x + 5, y: flattened.y2 ?? flattened.y + 3 }
+        {
+          x: flattened.x2 ?? flattened.x + 5,
+          y: flattened.y2 ?? flattened.y + 3,
+        },
       ];
     }
     return flattened as BaseElement;
   }, []);
 
-  const onElementCreated = useCallback((el: any) => {
-    const inflated = inflateElement(el);
-    setElements(prev => {
-      if (prev.find(e => e.id === inflated.id)) return prev;
-      return [...prev, inflated];
-    });
-  }, [inflateElement]);
+  const onElementCreated = useCallback(
+    (el: any) => {
+      const inflated = inflateElement(el);
+      setElements((prev) => {
+        if (prev.find((e) => e.id === inflated.id)) return prev;
+        return [...prev, inflated];
+      });
+    },
+    [inflateElement],
+  );
 
-  const onElementUpdated = useCallback((el: any) => {
-    const inflated = inflateElement(el);
-    setElements(prev => prev.map(e => e.id === inflated.id ? inflated : e));
-  }, [inflateElement]);
+  const onElementUpdated = useCallback(
+    (el: any) => {
+      const inflated = inflateElement(el);
+      setElements((prev) =>
+        prev.map((e) => (e.id === inflated.id ? inflated : e)),
+      );
+    },
+    [inflateElement],
+  );
 
   const onElementDeleted = useCallback((id: string) => {
-    setElements(prev => prev.filter(e => e.id !== id));
+    setElements((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
-  const { 
-    peerId, 
-    slug: channelId, 
+  const {
+    peerId,
+    slug: channelId,
     space,
-    status, 
-    setSlug: setChannelId, 
+    status,
+    setSlug: setChannelId,
     sendBroadcastSync: sendData,
     addElementToDb,
     updateElementInDb,
-    deleteElementFromDb
+    deleteElementFromDb,
   } = useRealtime(
     "",
     onRemoteData,
     onElementCreated,
     onElementUpdated,
-    onElementDeleted
+    onElementDeleted,
   );
 
   useEffect(() => {
@@ -391,7 +340,7 @@ const AsciiEditor: React.FC = () => {
           .from("elements")
           .select("*")
           .eq("space_id", space.id);
-        
+
         if (!error && data) {
           const inflated = data.map((el: any) => inflateElement(el));
           setElements(inflated);
@@ -417,7 +366,12 @@ const AsciiEditor: React.FC = () => {
 
   // Sync elements to peers (Bi-directional - only for ephemeral broadcast mode)
   useEffect(() => {
-    if (isLoaded && !space?.id && status === "connected" && !isRemoteUpdate.current) {
+    if (
+      isLoaded &&
+      !space?.id &&
+      status === "connected" &&
+      !isRemoteUpdate.current
+    ) {
       sendData(elements);
     }
   }, [elements, status, sendData, isLoaded, space?.id]);
@@ -484,20 +438,15 @@ const AsciiEditor: React.FC = () => {
             const parsed = JSON.parse(saved);
             if (parsed && parsed.length > 0) {
               setElements(parsed);
-            } else {
-              setElements(getWelcomeElements());
             }
-          } catch (e) {
-            setElements(getWelcomeElements());
-          }
+          } catch (e) {}
         } else {
-          setElements(getWelcomeElements());
         }
         setIsLoaded(true);
       }
     };
     initLoad();
-  }, [getWelcomeElements, isLoaded, space?.id]);
+  }, [isLoaded, space?.id]);
 
   // 2. Persist to LocalStorage ONLY in local mode
   useEffect(() => {
@@ -514,30 +463,38 @@ const AsciiEditor: React.FC = () => {
 
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    if (
-      canvas.width !== rect.width * dpr ||
-      canvas.height !== rect.height * dpr
-    ) {
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+    const physicalWidth = Math.round(rect.width * dpr);
+    const physicalHeight = Math.round(rect.height * dpr);
+
+    if (canvas.width !== physicalWidth || canvas.height !== physicalHeight) {
+      canvas.width = physicalWidth;
+      canvas.height = physicalHeight;
     }
 
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.save();
-    ctx.scale(dpr, dpr);
+    const scaleX = physicalWidth / rect.width;
+    const scaleY = physicalHeight / rect.height;
 
     ctx.save();
-    ctx.translate(viewOffset.x, viewOffset.y);
+    ctx.scale(scaleX, scaleY);
+
+    ctx.save();
+    // Snap viewOffset to physical pixels to avoid blurriness and offsets on high-DPI/non-integer scaling
+    const tx = Math.round(viewOffset.x * dpr) / dpr;
+    const ty = Math.round(viewOffset.y * dpr) / dpr;
+    ctx.translate(tx, ty);
 
     // Grid
     ctx.strokeStyle = "#F0F0F0";
     ctx.lineWidth = 1;
     const startCol = Math.floor(-viewOffset.x / visualCellSize);
-    const endCol = startCol + Math.ceil(canvas.width / (visualCellSize * dpr)) + 1;
+    const endCol =
+      startCol + Math.ceil(canvas.width / (visualCellSize * dpr)) + 1;
     const startRow = Math.floor(-viewOffset.y / visualCellSize);
-    const endRow = startRow + Math.ceil(canvas.height / (visualCellSize * dpr)) + 1;
+    const endRow =
+      startRow + Math.ceil(canvas.height / (visualCellSize * dpr)) + 1;
 
     ctx.beginPath();
     for (let i = startCol; i <= endCol; i++) {
@@ -580,20 +537,28 @@ const AsciiEditor: React.FC = () => {
       ctx.setLineDash([2, 2]);
       ctx.lineWidth = 1;
       ctx.fillStyle = "rgba(0, 0, 128, 0.1)";
-      
+
       const canvasRect = canvas.getBoundingClientRect();
       const x = Math.min(selectionStart.x, selectionEnd.x) - canvasRect.left;
       const y = Math.min(selectionStart.y, selectionEnd.y) - canvasRect.top;
       const w = Math.abs(selectionStart.x - selectionEnd.x);
       const h = Math.abs(selectionStart.y - selectionEnd.y);
-      
+
       ctx.fillRect(x, y, w, h);
       ctx.strokeRect(x, y, w, h);
       ctx.restore();
     }
 
     ctx.restore();
-  }, [elements, selectedIds, visualCellSize, viewOffset, isSelectingArea, selectionStart, selectionEnd]);
+  }, [
+    elements,
+    selectedIds,
+    visualCellSize,
+    viewOffset,
+    isSelectingArea,
+    selectionStart,
+    selectionEnd,
+  ]);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -608,7 +573,7 @@ const AsciiEditor: React.FC = () => {
   const handleMouseUp = useCallback(async () => {
     const wasSelecting = isSelectingArea;
     const wasDragging = hasDragged.current;
-    
+
     // Reset UI states immediately for responsiveness
     setIsDragging(false);
     setIsResizing(false);
@@ -625,25 +590,29 @@ const AsciiEditor: React.FC = () => {
       const canvas = canvasRef.current;
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
-        const newlySelected = elementsRef.current.filter(el => {
-          if (!hasExtension(el.type)) return false;
-          const b = getExtension(el.type).getBounds(el);
-          const screenL = b.left * visualCellSize + viewOffset.x + rect.left;
-          const screenT = b.top * visualCellSize + viewOffset.y + rect.top;
-          const screenR = b.right * visualCellSize + viewOffset.x + rect.left;
-          const screenB = b.bottom * visualCellSize + viewOffset.y + rect.top;
+        const newlySelected = elementsRef.current
+          .filter((el) => {
+            if (!hasExtension(el.type)) return false;
+            const b = getExtension(el.type).getBounds(el);
+            const screenL = b.left * visualCellSize + viewOffset.x + rect.left;
+            const screenT = b.top * visualCellSize + viewOffset.y + rect.top;
+            const screenR = b.right * visualCellSize + viewOffset.x + rect.left;
+            const screenB = b.bottom * visualCellSize + viewOffset.y + rect.top;
 
-          return screenL < x2 && screenR > x1 && screenT < y2 && screenB > y1;
-        }).map(el => el.id);
+            return screenL < x2 && screenR > x1 && screenT < y2 && screenB > y1;
+          })
+          .map((el) => el.id);
 
-        setSelectedIds(prev => Array.from(new Set([...prev, ...newlySelected])));
+        setSelectedIds((prev) =>
+          Array.from(new Set([...prev, ...newlySelected])),
+        );
       }
     }
 
     if (wasDragging && space?.id) {
       const movedIds = [...selectedIds, ...capturedIds];
-      const updates = movedIds.map(id => {
-        const el = elementsRef.current.find(e => e.id === id);
+      const updates = movedIds.map((id) => {
+        const el = elementsRef.current.find((e) => e.id === id);
         if (el) return updateElementInDb(id, el);
         return Promise.resolve();
       });
@@ -652,23 +621,28 @@ const AsciiEditor: React.FC = () => {
 
     hasDragged.current = false;
     setCapturedIds([]);
-  }, [isSelectingArea, selectionStart, selectionEnd, visualCellSize, viewOffset, space?.id, updateElementInDb, selectedIds, capturedIds]);
+  }, [
+    isSelectingArea,
+    selectionStart,
+    selectionEnd,
+    visualCellSize,
+    viewOffset,
+    space?.id,
+    updateElementInDb,
+    selectedIds,
+    capturedIds,
+  ]);
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
-    const clickedEl = [...elements]
-      .reverse()
-      .find((el) => {
-        if (el.locked || el.hidden || !hasExtension(el.type)) return false;
-        const ext = getExtension(el.type);
-        const b = ext.getBounds(el);
-        return (
-          gridX >= b.left &&
-          gridX < b.right &&
-          gridY >= b.top &&
-          gridY < b.bottom
-        );
-      });
+    const clickedEl = [...elements].reverse().find((el) => {
+      if (el.locked || el.hidden || !hasExtension(el.type)) return false;
+      const ext = getExtension(el.type);
+      const b = ext.getBounds(el);
+      return (
+        gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom
+      );
+    });
 
     if (clickedEl?.type === "text" && !hasDragged.current) {
       setSelectedIds([clickedEl.id]);
@@ -712,19 +686,17 @@ const AsciiEditor: React.FC = () => {
       }
 
       // Logic to select element under right-click if not already selected
-      const clickedEl = [...elements]
-        .reverse()
-        .find((el) => {
-          if (el.locked || el.hidden || !hasExtension(el.type)) return false;
-          const ext = getExtension(el.type);
-          const b = ext.getBounds(el);
-          return (
-            gridX >= b.left &&
-            gridX < b.right &&
-            gridY >= b.top &&
-            gridY < b.bottom
-          );
-        });
+      const clickedEl = [...elements].reverse().find((el) => {
+        if (el.locked || el.hidden || !hasExtension(el.type)) return false;
+        const ext = getExtension(el.type);
+        const b = ext.getBounds(el);
+        return (
+          gridX >= b.left &&
+          gridX < b.right &&
+          gridY >= b.top &&
+          gridY < b.bottom
+        );
+      });
 
       if (clickedEl) {
         if (!selectedIds.includes(clickedEl.id)) {
@@ -756,7 +728,10 @@ const AsciiEditor: React.FC = () => {
       pushToHistory();
       setElements((prev) =>
         prev.map((el) => {
-          if (el.id === elementId && (el.type === "vector" || el.type === "line")) {
+          if (
+            el.id === elementId &&
+            (el.type === "vector" || el.type === "line")
+          ) {
             const vec = el as VectorElement | LineElement;
             const points = vec.points;
             if (points.length <= 2) return el; // Minimum 2 points
@@ -770,9 +745,7 @@ const AsciiEditor: React.FC = () => {
               // If we delete start/end, we might want to clear connection
               startElementId: pointIndex === 0 ? undefined : vec.startElementId,
               endElementId:
-                pointIndex === points.length - 1
-                  ? undefined
-                  : vec.endElementId,
+                pointIndex === points.length - 1 ? undefined : vec.endElementId,
             };
           }
           return el;
@@ -792,7 +765,8 @@ const AsciiEditor: React.FC = () => {
       const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
       mouseGridPos.current = { x: gridX, y: gridY };
 
-      if (isSelectingArea) {        setSelectionEnd({ x: e.clientX, y: e.clientY });
+      if (isSelectingArea) {
+        setSelectionEnd({ x: e.clientX, y: e.clientY });
         return;
       }
 
@@ -829,7 +803,10 @@ const AsciiEditor: React.FC = () => {
       } else if (draggedPointIndex !== null && selectedIds.length === 1) {
         setElements((prev) =>
           prev.map((el) => {
-            if (el.id === selectedIds[0] && (el.type === "vector" || el.type === "line")) {
+            if (
+              el.id === selectedIds[0] &&
+              (el.type === "vector" || el.type === "line")
+            ) {
               const vec = el as VectorElement | LineElement;
               const points = vec.points;
               const isStart = draggedPointIndex === 0;
@@ -969,7 +946,7 @@ const AsciiEditor: React.FC = () => {
   );
   const handleTouchEnd = useCallback(async () => {
     const wasDragging = hasDragged.current;
-    
+
     setTouchDist(null);
     setIsDragging(false);
     setIsResizing(false);
@@ -979,8 +956,8 @@ const AsciiEditor: React.FC = () => {
 
     if (wasDragging && space?.id) {
       const movedIds = [...selectedIds, ...capturedIds];
-      const updates = movedIds.map(id => {
-        const el = elementsRef.current.find(e => e.id === id);
+      const updates = movedIds.map((id) => {
+        const el = elementsRef.current.find((e) => e.id === id);
         if (el) return updateElementInDb(id, el);
         return Promise.resolve();
       });
@@ -1047,7 +1024,10 @@ const AsciiEditor: React.FC = () => {
         } else if (draggedPointIndex !== null && selectedIds.length === 1) {
           setElements((prev) =>
             prev.map((el) => {
-              if (el.id === selectedIds[0] && (el.type === "vector" || el.type === "line")) {
+              if (
+                el.id === selectedIds[0] &&
+                (el.type === "vector" || el.type === "line")
+              ) {
                 const vec = el as VectorElement | LineElement;
                 const points = vec.points;
                 const isStart = draggedPointIndex === 0;
@@ -1065,10 +1045,14 @@ const AsciiEditor: React.FC = () => {
                         !selectedIds.includes(other.id) &&
                         other.type !== "vector" &&
                         other.type !== "line" &&
-                        gridX >= getExtension(other.type).getBounds(other).left &&
-                        gridX < getExtension(other.type).getBounds(other).right &&
-                        gridY >= getExtension(other.type).getBounds(other).top &&
-                        gridY < getExtension(other.type).getBounds(other).bottom,
+                        gridX >=
+                          getExtension(other.type).getBounds(other).left &&
+                        gridX <
+                          getExtension(other.type).getBounds(other).right &&
+                        gridY >=
+                          getExtension(other.type).getBounds(other).top &&
+                        gridY <
+                          getExtension(other.type).getBounds(other).bottom,
                     );
 
                   if (hit) {
@@ -1107,8 +1091,7 @@ const AsciiEditor: React.FC = () => {
               return el;
             }),
           );
-        }
- else if (isDragging && selectedIds.length > 0) {
+        } else if (isDragging && selectedIds.length > 0) {
           const dx = gridX - dragOffset.current.x;
           const dy = gridY - dragOffset.current.y;
           if (dx !== 0 || dy !== 0) {
@@ -1233,7 +1216,7 @@ const AsciiEditor: React.FC = () => {
     const mouseY = e.clientY - rect.top;
 
     const { x: gridX, y: gridY } = getGridCoords(e.clientX, e.clientY);
-    
+
     // Triple click to create new text element
     if (e.detail === 3) {
       addElement("text", gridX, gridY, { text: "" }).then((el) => {
@@ -1305,29 +1288,24 @@ const AsciiEditor: React.FC = () => {
     }
 
     // Selection logic
-    const clickedEl = [...elements]
-      .reverse()
-      .find((el) => {
-        if (el.locked || el.hidden || !hasExtension(el.type)) return false;
-        const ext = getExtension(el.type);
-        const b = ext.getBounds(el);
-        return (
-          gridX >= b.left &&
-          gridX < b.right &&
-          gridY >= b.top &&
-          gridY < b.bottom
-        );
-      });
+    const clickedEl = [...elements].reverse().find((el) => {
+      if (el.locked || el.hidden || !hasExtension(el.type)) return false;
+      const ext = getExtension(el.type);
+      const b = ext.getBounds(el);
+      return (
+        gridX >= b.left && gridX < b.right && gridY >= b.top && gridY < b.bottom
+      );
+    });
 
     const isCtrl = e.ctrlKey || e.metaKey;
 
     if (clickedEl) {
       pushToHistory();
-      
+
       let nextIds: string[];
       if (isCtrl) {
         if (selectedIds.includes(clickedEl.id)) {
-          nextIds = selectedIds.filter(id => id !== clickedEl.id);
+          nextIds = selectedIds.filter((id) => id !== clickedEl.id);
         } else {
           nextIds = [...selectedIds, clickedEl.id];
         }
@@ -1338,18 +1316,20 @@ const AsciiEditor: React.FC = () => {
           nextIds = [clickedEl.id];
         }
       }
-      
+
       setSelectedIds(nextIds);
       setIsDragging(true);
       dragOffset.current = { x: gridX, y: gridY };
-      
+
       // Captured IDs logic (for children inside boxes)
       const allCaptured: string[] = [];
       for (const id of nextIds) {
-        const el = elements.find(e => e.id === id);
+        const el = elements.find((e) => e.id === id);
         if (el?.type === "box") {
-          const children = elements.filter(child => isInside(child, el) && !nextIds.includes(child.id));
-          allCaptured.push(...children.map(c => c.id));
+          const children = elements.filter(
+            (child) => isInside(child, el) && !nextIds.includes(child.id),
+          );
+          allCaptured.push(...children.map((c) => c.id));
         }
       }
       setCapturedIds(allCaptured);
@@ -1415,10 +1395,7 @@ const AsciiEditor: React.FC = () => {
             const px = p.x * visualCellSize + viewOffset.x + visualCellSize / 2;
             const py = p.y * visualCellSize + viewOffset.y + visualCellSize / 2;
 
-            if (
-              Math.abs(mouseX - px) < 30 &&
-              Math.abs(mouseY - py) < 30
-            ) {
+            if (Math.abs(mouseX - px) < 30 && Math.abs(mouseY - py) < 30) {
               pushToHistory();
               setDraggedPointIndex(i);
               hasDragged.current = true;
@@ -1427,19 +1404,17 @@ const AsciiEditor: React.FC = () => {
           }
         }
       }
-      const clickedEl = [...elements]
-        .reverse()
-        .find((el) => {
-          if (el.locked || el.hidden || !hasExtension(el.type)) return false;
-          const ext = getExtension(el.type);
-          const b = ext.getBounds(el);
-          return (
-            gridX >= b.left &&
-            gridX < b.right &&
-            gridY >= b.top &&
-            gridY < b.bottom
-          );
-        });
+      const clickedEl = [...elements].reverse().find((el) => {
+        if (el.locked || el.hidden || !hasExtension(el.type)) return false;
+        const ext = getExtension(el.type);
+        const b = ext.getBounds(el);
+        return (
+          gridX >= b.left &&
+          gridX < b.right &&
+          gridY >= b.top &&
+          gridY < b.bottom
+        );
+      });
       if (clickedEl) {
         pushToHistory();
         setSelectedIds([clickedEl.id]);
@@ -1462,54 +1437,74 @@ const AsciiEditor: React.FC = () => {
     }
   };
 
-  const addElement = useCallback(async (type: string, x?: number, y?: number, params?: any) => {
-    if (elements.length >= 100) {
-      sileo.error({
-        title: "System Capacity Reached",
-        description: "Maximum 100 neural objects allowed per sector."
-      });
-      return null;
-    }
-    pushToHistory();
-    const ext = getExtension(type);
-    
-    // Default position: center of view
-    const posX = x ?? Math.floor((window.innerWidth / 2 - viewOffset.x) / visualCellSize);
-    const posY = y ?? Math.floor((window.innerHeight / 2 - viewOffset.y) / visualCellSize);
-    
-    const newEl = ext.create(
-      posX,
-      posY,
-      params || (type === "text" ? { text: newText.trim() || "NEW TEXT" } : {}),
-    );
-
-    // Persistence: Add to DB if in a space
-    if (space?.id) {
-      const res = await addElementToDb(newEl);
-      if (res) {
-        const { data, error } = res;
-        if (error) {
-          sileo.error({ title: "Registration Failure", description: error.message });
-          return null;
-        } else if (data) {
-          const inflated = inflateElement(data);
-          setElements(prev => {
-            if (prev.find(e => e.id === inflated.id)) return prev;
-            return [...prev, inflated];
-          });
-          setSelectedIds([inflated.id]);
-          return inflated;
-        }
+  const addElement = useCallback(
+    async (type: string, x?: number, y?: number, params?: any) => {
+      if (elements.length >= 100) {
+        sileo.error({
+          title: "System Capacity Reached",
+          description: "Maximum 100 neural objects allowed per sector.",
+        });
+        return null;
       }
-    } else {
-      setElements(prev => [...prev, newEl]);
-      setSelectedIds([newEl.id]);
-      return newEl;
-    }
-    
-    setNewText("");
-    return null;
-  }, [elements.length, pushToHistory, viewOffset, visualCellSize, newText, space?.id, addElementToDb, inflateElement]);
+      pushToHistory();
+      const ext = getExtension(type);
+
+      // Default position: center of view
+      const posX =
+        x ??
+        Math.floor((window.innerWidth / 2 - viewOffset.x) / visualCellSize);
+      const posY =
+        y ??
+        Math.floor((window.innerHeight / 2 - viewOffset.y) / visualCellSize);
+
+      const newEl = ext.create(
+        posX,
+        posY,
+        params ||
+          (type === "text" ? { text: newText.trim() || "NEW TEXT" } : {}),
+      );
+
+      // Persistence: Add to DB if in a space
+      if (space?.id) {
+        const res = await addElementToDb(newEl);
+        if (res) {
+          const { data, error } = res;
+          if (error) {
+            sileo.error({
+              title: "Registration Failure",
+              description: error.message,
+            });
+            return null;
+          } else if (data) {
+            const inflated = inflateElement(data);
+            setElements((prev) => {
+              if (prev.find((e) => e.id === inflated.id)) return prev;
+              return [...prev, inflated];
+            });
+            setSelectedIds([inflated.id]);
+            return inflated;
+          }
+        }
+      } else {
+        setElements((prev) => [...prev, newEl]);
+        setSelectedIds([newEl.id]);
+        return newEl;
+      }
+
+      setNewText("");
+      return null;
+    },
+    [
+      elements.length,
+      pushToHistory,
+      viewOffset,
+      visualCellSize,
+      newText,
+      space?.id,
+      addElementToDb,
+      inflateElement,
+    ],
+  );
 
   const saveProject = () => {
     try {
@@ -1523,10 +1518,13 @@ const AsciiEditor: React.FC = () => {
       URL.revokeObjectURL(url);
       sileo.success({
         title: "Sequence Archived",
-        description: "Project manifest successfully exported to local storage."
+        description: "Project manifest successfully exported to local storage.",
       });
     } catch (err) {
-      sileo.error({ title: "Archival Failure", description: "Failed to serialize current canvas state." });
+      sileo.error({
+        title: "Archival Failure",
+        description: "Failed to serialize current canvas state.",
+      });
     }
   };
 
@@ -1541,10 +1539,13 @@ const AsciiEditor: React.FC = () => {
         setElements(loadedElements);
         sileo.info({
           title: "Sequence Restored",
-          description: `Successfully materialized ${loadedElements.length} objects.`
+          description: `Successfully materialized ${loadedElements.length} objects.`,
         });
       } catch (_err) {
-        sileo.error({ title: "Materialization Error", description: "Invalid project manifest detected." });
+        sileo.error({
+          title: "Materialization Error",
+          description: "Invalid project manifest detected.",
+        });
       }
     };
     reader.readAsText(file);
@@ -1564,10 +1565,12 @@ const AsciiEditor: React.FC = () => {
     if (elements.length === 0) return;
 
     // 1. Calculate bounds
-    const registeredElements = elements.filter(el => hasExtension(el.type));
+    const registeredElements = elements.filter((el) => hasExtension(el.type));
     if (registeredElements.length === 0) return;
 
-    const bounds = registeredElements.map((el) => getExtension(el.type).getBounds(el));
+    const bounds = registeredElements.map((el) =>
+      getExtension(el.type).getBounds(el),
+    );
     const minX = Math.min(...bounds.map((b) => b.left));
     const maxX = Math.max(...bounds.map((b) => b.right));
     const minY = Math.min(...bounds.map((b) => b.top));
@@ -1589,10 +1592,7 @@ const AsciiEditor: React.FC = () => {
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, width, height);
 
-    ctx.translate(
-      (-minX + 1) * CELL_SIZE,
-      (-minY + 1) * CELL_SIZE
-    );
+    ctx.translate((-minX + 1) * CELL_SIZE, (-minY + 1) * CELL_SIZE);
 
     for (const el of registeredElements) {
       const ext = getExtension(el.type);
@@ -1618,75 +1618,97 @@ const AsciiEditor: React.FC = () => {
 
   const copySelected = useCallback(() => {
     if (selectedIds.length === 0) return;
-    const selectedElements = elementsRef.current.filter((el) => selectedIds.includes(el.id));
+    const selectedElements = elementsRef.current.filter((el) =>
+      selectedIds.includes(el.id),
+    );
     setClipboard(JSON.parse(JSON.stringify(selectedElements)));
-    sileo.info({ title: "System", description: `${selectedElements.length} object(s) copied to clipboard.` });
+    sileo.info({
+      title: "System",
+      description: `${selectedElements.length} object(s) copied to clipboard.`,
+    });
   }, [selectedIds]);
 
-  const paste = useCallback(async (targetX?: number, targetY?: number) => {
-    if (clipboard.length === 0) return;
-    
-    pushToHistory();
-    
-    let offsetX = 0;
-    let offsetY = 0;
+  const paste = useCallback(
+    async (targetX?: number, targetY?: number) => {
+      if (clipboard.length === 0) return;
 
-    if (targetX !== undefined && targetY !== undefined) {
-      // Calculate the bounding box of the clipboard elements to find the center
-      const bounds = clipboard.map(el => {
-        if (!hasExtension(el.type)) return { left: el.x, top: el.y, right: el.x + 1, bottom: el.y + 1 };
-        return getExtension(el.type).getBounds(el);
-      });
-      
-      const minX = Math.min(...bounds.map(b => b.left));
-      const minY = Math.min(...bounds.map(b => b.top));
-      const maxX = Math.max(...bounds.map(b => b.right));
-      const maxY = Math.max(...bounds.map(b => b.bottom));
-      
-      // Calculate the center of the group
-      const centerX = (minX + maxX) / 2;
-      const centerY = (minY + maxY) / 2;
-      
-      // Offset so the center of the group aligns with the target
-      offsetX = Math.round(targetX - centerX);
-      offsetY = Math.round(targetY - centerY);
-    }
+      pushToHistory();
 
-    const newElements: BaseElement[] = [];
-    const newIds: string[] = [];
+      let offsetX = 0;
+      let offsetY = 0;
 
-    for (const el of clipboard) {
-      if (!hasExtension(el.type)) continue;
-      const ext = getExtension(el.type);
-      
-      // Clean up metadata from copied element to create a fresh one
-      const { id: _, x, y, created_at, updated_at, space_id, created_by, isCenter, ...params } = el as any;
-      
-      const newEl = ext.create(x + offsetX, y + offsetY, params);
-      
-      if (space?.id) {
-        const res = await addElementToDb(newEl);
-        if (res?.data) {
-          const inflated = inflateElement(res.data);
-          newElements.push(inflated);
-          newIds.push(inflated.id);
-        }
-      } else {
-        newElements.push(newEl);
-        newIds.push(newEl.id);
+      if (targetX !== undefined && targetY !== undefined) {
+        // Calculate the bounding box of the clipboard elements to find the center
+        const bounds = clipboard.map((el) => {
+          if (!hasExtension(el.type))
+            return { left: el.x, top: el.y, right: el.x + 1, bottom: el.y + 1 };
+          return getExtension(el.type).getBounds(el);
+        });
+
+        const minX = Math.min(...bounds.map((b) => b.left));
+        const minY = Math.min(...bounds.map((b) => b.top));
+        const maxX = Math.max(...bounds.map((b) => b.right));
+        const maxY = Math.max(...bounds.map((b) => b.bottom));
+
+        // Calculate the center of the group
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        // Offset so the center of the group aligns with the target
+        offsetX = Math.round(targetX - centerX);
+        offsetY = Math.round(targetY - centerY);
       }
-    }
 
-    if (newElements.length > 0) {
-      setElements((prev) => [...prev, ...newElements]);
-      setSelectedIds(newIds);
-      
-      // Update clipboard with new positions for subsequent "blind" pastes
-      setClipboard(newElements.map(el => JSON.parse(JSON.stringify(el))));
-      
-      sileo.success({ title: "System", description: `${newElements.length} object(s) materialized.` });
-    }
-  }, [clipboard, space?.id, addElementToDb, pushToHistory, inflateElement]);
+      const newElements: BaseElement[] = [];
+      const newIds: string[] = [];
+
+      for (const el of clipboard) {
+        if (!hasExtension(el.type)) continue;
+        const ext = getExtension(el.type);
+
+        // Clean up metadata from copied element to create a fresh one
+        const {
+          id: _,
+          x,
+          y,
+          created_at,
+          updated_at,
+          space_id,
+          created_by,
+          isCenter,
+          ...params
+        } = el as any;
+
+        const newEl = ext.create(x + offsetX, y + offsetY, params);
+
+        if (space?.id) {
+          const res = await addElementToDb(newEl);
+          if (res?.data) {
+            const inflated = inflateElement(res.data);
+            newElements.push(inflated);
+            newIds.push(inflated.id);
+          }
+        } else {
+          newElements.push(newEl);
+          newIds.push(newEl.id);
+        }
+      }
+
+      if (newElements.length > 0) {
+        setElements((prev) => [...prev, ...newElements]);
+        setSelectedIds(newIds);
+
+        // Update clipboard with new positions for subsequent "blind" pastes
+        setClipboard(newElements.map((el) => JSON.parse(JSON.stringify(el))));
+
+        sileo.success({
+          title: "System",
+          description: `${newElements.length} object(s) materialized.`,
+        });
+      }
+    },
+    [clipboard, space?.id, addElementToDb, pushToHistory, inflateElement],
+  );
 
   const deleteSelected = useCallback(
     async (id?: string) => {
@@ -1694,7 +1716,7 @@ const AsciiEditor: React.FC = () => {
       if (targets.length === 0) return;
       pushToHistory();
       setElements((prev) => prev.filter((el) => !targets.includes(el.id)));
-      setSelectedIds(prev => prev.filter(id => !targets.includes(id)));
+      setSelectedIds((prev) => prev.filter((id) => !targets.includes(id)));
 
       // Persistence: Delete from DB if in a space
       if (space?.id) {
@@ -1713,7 +1735,10 @@ const AsciiEditor: React.FC = () => {
 
       const isMod = e.ctrlKey || e.metaKey;
       const target = e.target as HTMLElement;
-      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
 
       if (isMod && e.key === "z") {
         if (isInput) return;
@@ -1739,10 +1764,12 @@ const AsciiEditor: React.FC = () => {
   }, [undo, copySelected, paste, deleteSelected, isEditing]);
   const generateAscii = () => {
     if (elements.length === 0) return;
-    const registeredElements = elements.filter(el => hasExtension(el.type));
+    const registeredElements = elements.filter((el) => hasExtension(el.type));
     if (registeredElements.length === 0) return;
-    
-    const bounds = registeredElements.map((el) => getExtension(el.type).getBounds(el));
+
+    const bounds = registeredElements.map((el) =>
+      getExtension(el.type).getBounds(el),
+    );
     const minX = Math.min(...bounds.map((b) => b.left));
     const maxX = Math.max(...bounds.map((b) => b.right));
     const minY = Math.min(...bounds.map((b) => b.top));
@@ -1762,7 +1789,10 @@ const AsciiEditor: React.FC = () => {
     setShowAscii(true);
   };
 
-  const selectedElement = selectedIds.length === 1 ? elements.find((el) => el.id === selectedIds[0]) : null;
+  const selectedElement =
+    selectedIds.length === 1
+      ? elements.find((el) => el.id === selectedIds[0])
+      : null;
 
   const selectAndCenterElement = useCallback(
     (id: string | null) => {
@@ -1795,7 +1825,11 @@ const AsciiEditor: React.FC = () => {
         onTouchStart={handleTouchStart}
         onContextMenu={handleContextMenu}
         className={`fixed inset-0 w-full h-full block bg-[#f1f5f9] ${
-          isPanning ? "cursor-grabbing" : spacePressed ? "cursor-grab" : "cursor-default"
+          isPanning
+            ? "cursor-grabbing"
+            : spacePressed
+              ? "cursor-grab"
+              : "cursor-default"
         }`}
       />
 
@@ -1803,8 +1837,14 @@ const AsciiEditor: React.FC = () => {
         <textarea
           className="fixed z-200 bg-white border-2 border-(--os-border-dark) font-mono resize-none outline-none overflow-hidden shadow-[2px_2px_0_rgba(0,0,0,0.5)]"
           style={{
-            left: selectedElement.x * visualCellSize + viewOffset.x + (canvasRef.current?.getBoundingClientRect().left || 0),
-            top: selectedElement.y * visualCellSize + viewOffset.y + (canvasRef.current?.getBoundingClientRect().top || 0),
+            left:
+              selectedElement.x * visualCellSize +
+              viewOffset.x +
+              (canvasRef.current?.getBoundingClientRect().left || 0),
+            top:
+              selectedElement.y * visualCellSize +
+              viewOffset.y +
+              (canvasRef.current?.getBoundingClientRect().top || 0),
             width:
               Math.max(
                 ...(selectedElement as TextElement).text
@@ -1843,7 +1883,9 @@ const AsciiEditor: React.FC = () => {
         <div className="glass-surface rounded-2xl p-2 flex items-center justify-between shadow-2xl pointer-events-auto border-white/20">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 px-3 py-1 rounded-xl text-zinc-900">
-              <span className="font-bold text-xs tracking-tight">ascii_canva</span>
+              <span className="font-bold text-xs tracking-tight">
+                ascii_canva
+              </span>
             </div>
 
             <div className="h-6 w-px bg-zinc-200" />
@@ -1860,7 +1902,12 @@ const AsciiEditor: React.FC = () => {
                 </button>
                 <label className="genesis-button h-8 px-3 text-[11px] cursor-pointer">
                   Open
-                  <input type="file" onChange={loadProject} className="hidden" accept=".json" />
+                  <input
+                    type="file"
+                    onChange={loadProject}
+                    className="hidden"
+                    accept=".json"
+                  />
                 </label>
                 <button
                   type="button"
@@ -1901,27 +1948,49 @@ const AsciiEditor: React.FC = () => {
               onClick={() => setShowAiChat(!showAiChat)}
               className={`genesis-button h-8 px-3 ${showAiChat ? "bg-green-100 border-green-200 text-green-700" : ""}`}
             >
-              <Bot size={14} /> <span className="text-[11px] font-bold">AI</span>
+              <Bot size={14} />{" "}
+              <span className="text-[11px] font-bold">AI</span>
             </button>
-            
+
             <div className="h-6 w-px bg-zinc-300/50 mx-1" />
 
-            <button onClick={() => setShowExplorer(!showExplorer)} className="genesis-button h-8 px-3" title="Explorer">
+            <button
+              onClick={() => setShowExplorer(!showExplorer)}
+              className="genesis-button h-8 px-3"
+              title="Explorer"
+            >
               <Layers size={14} />
             </button>
-            <button onClick={() => setShowTutorial(true)} className="genesis-button h-8 px-3" title="Tutorial">
+            <button
+              onClick={() => setShowTutorial(true)}
+              className="genesis-button h-8 px-3"
+              title="Tutorial"
+            >
               <Book size={14} />
             </button>
-            <Link href="/docs" target="_blank" className="genesis-button h-8 px-3" title="Documentation">
+            <Link
+              href="/docs"
+              target="_blank"
+              className="genesis-button h-8 px-3"
+              title="Documentation"
+            >
               <Puzzle size={14} />
             </Link>
-            <button onClick={() => setShowSpacesModal(true)} className="genesis-button h-8 px-3" title="Spaces">
+            <button
+              onClick={() => setShowSpacesModal(true)}
+              className="genesis-button h-8 px-3"
+              title="Spaces"
+            >
               <Users size={14} />
             </button>
-            <button onClick={() => setShowApiKeyModal(true)} className="genesis-button h-8 px-3" title="API Keys">
+            <button
+              onClick={() => setShowApiKeyModal(true)}
+              className="genesis-button h-8 px-3"
+              title="API Keys"
+            >
               <Key size={14} />
             </button>
-            
+
             <div className="flex gap-1 ml-2">
               <button
                 type="button"
@@ -1938,7 +2007,9 @@ const AsciiEditor: React.FC = () => {
         {selectedIds.length > 0 && (
           <div className="glass-surface self-center rounded-xl px-4 py-2 flex items-center gap-6 shadow-xl border-white/20 animate-in slide-in-from-top-4 pointer-events-auto">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase text-zinc-400">Selection:</span>
+              <span className="text-[10px] font-bold uppercase text-zinc-400">
+                Selection:
+              </span>
               <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md text-[10px] font-bold border border-blue-100">
                 {selectedIds.length} object(s)
               </span>
@@ -1979,7 +2050,10 @@ const AsciiEditor: React.FC = () => {
             >
               <div className="flex items-center gap-2.5">
                 <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                  <Puzzle size={14} className="text-zinc-500 group-hover:text-blue-600" />
+                  <Puzzle
+                    size={14}
+                    className="text-zinc-500 group-hover:text-blue-600"
+                  />
                 </div>
                 Insert
               </div>
@@ -1997,7 +2071,10 @@ const AsciiEditor: React.FC = () => {
                   className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-2.5 transition-colors group"
                 >
                   <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                    <ext.icon size={14} className="text-zinc-500 group-hover:text-blue-600" />
+                    <ext.icon
+                      size={14}
+                      className="text-zinc-500 group-hover:text-blue-600"
+                    />
                   </div>
                   {ext.label}
                 </button>
@@ -2030,7 +2107,10 @@ const AsciiEditor: React.FC = () => {
               className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-2.5 transition-colors group"
             >
               <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                <Copy size={14} className="text-zinc-500 group-hover:text-blue-600" />
+                <Copy
+                  size={14}
+                  className="text-zinc-500 group-hover:text-blue-600"
+                />
               </div>
               Copy
             </button>
@@ -2046,7 +2126,10 @@ const AsciiEditor: React.FC = () => {
               className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-2.5 transition-colors group"
             >
               <div className="w-6 h-6 rounded-lg bg-zinc-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                <FileText size={14} className="text-zinc-500 group-hover:text-blue-600" />
+                <FileText
+                  size={14}
+                  className="text-zinc-500 group-hover:text-blue-600"
+                />
               </div>
               Paste
             </button>
@@ -2069,7 +2152,10 @@ const AsciiEditor: React.FC = () => {
               className="w-full text-left px-3 py-2 text-[12px] font-semibold text-red-500 hover:bg-red-50 rounded-xl flex items-center gap-2.5 transition-colors group"
             >
               <div className="w-6 h-6 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
-                <Trash2 size={14} className="text-red-400 group-hover:text-red-600" />
+                <Trash2
+                  size={14}
+                  className="text-red-400 group-hover:text-red-600"
+                />
               </div>
               Delete Point
             </button>
@@ -2083,7 +2169,10 @@ const AsciiEditor: React.FC = () => {
               className="w-full text-left px-3 py-2 text-[12px] font-semibold text-red-500 hover:bg-red-50 rounded-xl flex items-center gap-2.5 transition-colors group"
             >
               <div className="w-6 h-6 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
-                <Trash2 size={14} className="text-red-400 group-hover:text-red-600" />
+                <Trash2
+                  size={14}
+                  className="text-red-400 group-hover:text-red-600"
+                />
               </div>
               Delete
             </button>
@@ -2166,9 +2255,7 @@ const AsciiEditor: React.FC = () => {
         <ExtensionMarketplace onClose={() => setShowMarketplace(false)} />
       )}
 
-      {showTutorial && (
-        <TutorialModal onClose={() => setShowTutorial(false)} />
-      )}
+      {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
 
       <LayerManager
         isOpen={showExplorer}
@@ -2180,8 +2267,8 @@ const AsciiEditor: React.FC = () => {
         onDeleteElement={deleteSelected}
       />
 
-      <AiChat 
-        isOpen={showAiChat} 
+      <AiChat
+        isOpen={showAiChat}
         onClose={() => setShowAiChat(false)}
         spaceId={space?.id || ""}
         apiKey={activeApiKey}

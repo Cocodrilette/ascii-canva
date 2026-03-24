@@ -46,10 +46,14 @@ export const lineExtension: AsciiExtension<LineElement, LineParams> = {
     ctx.strokeStyle = "#000000";
     ctx.lineWidth = 2;
     ctx.lineJoin = "round";
+    ctx.lineCap = "round";
 
     const points = element.points || [
       { x: element.x, y: element.y },
-      { x: (element as any).x2 ?? element.x + 5, y: (element as any).y2 ?? element.y + 3 }
+      {
+        x: (element as any).x2 ?? element.x + 5,
+        y: (element as any).y2 ?? element.y + 3,
+      },
     ];
 
     const rawSegments: { x: number; y: number }[] = [];
@@ -76,11 +80,15 @@ export const lineExtension: AsciiExtension<LineElement, LineParams> = {
       rawSegments.push({ x: x2, y: y2 });
     }
 
-    // Deduplicate consecutive points
+    // Deduplicate consecutive points with epsilon
+    const epsilon = 0.001;
     const drawSegments: { x: number; y: number }[] = rawSegments.filter(
       (p, i, arr) => {
         if (i === 0) return true;
-        return p.x !== arr[i - 1].x || p.y !== arr[i - 1].y;
+        return (
+          Math.abs(p.x - arr[i - 1].x) > epsilon ||
+          Math.abs(p.y - arr[i - 1].y) > epsilon
+        );
       },
     );
 
@@ -108,8 +116,8 @@ export const lineExtension: AsciiExtension<LineElement, LineParams> = {
       ctx.restore();
     }
 
-    // Apply margin if connected
-    const margin = visualCellSize * 0.4;
+    // Apply margin if connected - snap exactly to box edge (2px constant offset)
+    const margin = visualCellSize / 2 - 2;
     const finalPath = [...drawSegments];
 
     if (element.startElementId && finalPath.length >= 2) {
@@ -166,7 +174,10 @@ export const lineExtension: AsciiExtension<LineElement, LineParams> = {
 
     const points = element.points || [
       { x: element.x, y: element.y },
-      { x: (element as any).x2 ?? element.x + 5, y: (element as any).y2 ?? element.y + 3 }
+      {
+        x: (element as any).x2 ?? element.x + 5,
+        y: (element as any).y2 ?? element.y + 3,
+      },
     ];
 
     for (let i = 0; i < points.length - 1; i++) {
@@ -224,7 +235,10 @@ export const lineExtension: AsciiExtension<LineElement, LineParams> = {
 
     const points = element.points || [
       { x: element.x, y: element.y },
-      { x: (element as any).x2 ?? element.x + 5, y: (element as any).y2 ?? element.y + 3 }
+      {
+        x: (element as any).x2 ?? element.x + 5,
+        y: (element as any).y2 ?? element.y + 3,
+      },
     ];
 
     const rawNodes: LinePoint[] = [];

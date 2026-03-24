@@ -46,10 +46,14 @@ export const vectorExtension: AsciiExtension<VectorElement, VectorParams> = {
     ctx.strokeStyle = "#000000";
     ctx.lineWidth = 2;
     ctx.lineJoin = "round";
+    ctx.lineCap = "round";
 
     const points = element.points || [
       { x: element.x, y: element.y },
-      { x: (element as any).x2 ?? element.x + 5, y: (element as any).y2 ?? element.y + 3 }
+      {
+        x: (element as any).x2 ?? element.x + 5,
+        y: (element as any).y2 ?? element.y + 3,
+      },
     ];
 
     const rawSegments: { x: number; y: number }[] = [];
@@ -76,11 +80,15 @@ export const vectorExtension: AsciiExtension<VectorElement, VectorParams> = {
       rawSegments.push({ x: x2, y: y2 });
     }
 
-    // Deduplicate consecutive points
+    // Deduplicate consecutive points with epsilon
+    const epsilon = 0.001;
     const drawSegments: { x: number; y: number }[] = rawSegments.filter(
       (p, i, arr) => {
         if (i === 0) return true;
-        return p.x !== arr[i - 1].x || p.y !== arr[i - 1].y;
+        return (
+          Math.abs(p.x - arr[i - 1].x) > epsilon ||
+          Math.abs(p.y - arr[i - 1].y) > epsilon
+        );
       },
     );
 
@@ -108,8 +116,8 @@ export const vectorExtension: AsciiExtension<VectorElement, VectorParams> = {
       ctx.restore();
     }
 
-    // Apply margin if connected
-    const margin = visualCellSize * 0.4;
+    // Apply margin if connected - snap exactly to box edge (2px constant offset)
+    const margin = visualCellSize / 2 - 2;
     const finalPath = [...drawSegments];
 
     if (element.startElementId && finalPath.length >= 2) {
@@ -138,10 +146,10 @@ export const vectorExtension: AsciiExtension<VectorElement, VectorParams> = {
     }
     ctx.stroke();
 
-    // Arrowhead at the last segment
+    // Arrowhead at the last segment - scale with zoom
     const pEnd = finalPath[finalPath.length - 1];
     const pPrev = finalPath[finalPath.length - 2];
-    const headLen = 10;
+    const headLen = Math.max(6, visualCellSize * 0.6);
     const angle = Math.atan2(pEnd.y - pPrev.y, pEnd.x - pPrev.x);
 
     ctx.beginPath();
@@ -185,7 +193,10 @@ export const vectorExtension: AsciiExtension<VectorElement, VectorParams> = {
 
     const points = element.points || [
       { x: element.x, y: element.y },
-      { x: (element as any).x2 ?? element.x + 5, y: (element as any).y2 ?? element.y + 3 }
+      {
+        x: (element as any).x2 ?? element.x + 5,
+        y: (element as any).y2 ?? element.y + 3,
+      },
     ];
 
     for (let i = 0; i < points.length - 1; i++) {
@@ -243,7 +254,10 @@ export const vectorExtension: AsciiExtension<VectorElement, VectorParams> = {
 
     const points = element.points || [
       { x: element.x, y: element.y },
-      { x: (element as any).x2 ?? element.x + 5, y: (element as any).y2 ?? element.y + 3 }
+      {
+        x: (element as any).x2 ?? element.x + 5,
+        y: (element as any).y2 ?? element.y + 3,
+      },
     ];
 
     const rawNodes: VectorPoint[] = [];
