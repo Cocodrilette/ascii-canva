@@ -457,18 +457,20 @@ const AsciiEditor: React.FC = () => {
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
     if (
-      canvas.width !== rect.width ||
-      canvas.height !== rect.height
+      canvas.width !== rect.width * dpr ||
+      canvas.height !== rect.height * dpr
     ) {
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
     }
 
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
+    ctx.scale(dpr, dpr);
     ctx.translate(viewOffset.x, viewOffset.y);
 
     // Grid
