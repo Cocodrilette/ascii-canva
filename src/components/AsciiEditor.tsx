@@ -182,9 +182,19 @@ const AsciiEditor: React.FC = () => {
     elements.push(getExtension("line").create(0, -5, { points: [{x: 0, y: -5}, {x: 0, y: -2}] }));
 
     // Decision Node
-    const decisionDiamond = getExtension("diamond").create(0, 2, { size: 4 });
+    const diamondSize = 6;
+    const decisionDiamond = getExtension("diamond").create(0, 2, { size: diamondSize });
     elements.push(decisionDiamond);
-    elements.push(getExtension("text").create(-10, 1, { text: "COLLAB\nACTIVE?" }));
+    
+    const decisionText = "COLLAB\nACTIVE?";
+    const diamondBox = { 
+      x: decisionDiamond.x - diamondSize, 
+      y: decisionDiamond.y - diamondSize, 
+      w: diamondSize * 2 + 1, 
+      h: diamondSize * 2 + 1 
+    };
+    const decisionTextPos = getCenteredTextPos(decisionText, diamondBox.x, diamondBox.y, diamondBox.w, diamondBox.h);
+    elements.push(getExtension("text").create(decisionTextPos.x, decisionTextPos.y, { text: decisionText }));
 
     // Branch Left: No
     elements.push(getExtension("line").create(-4, 2, { points: [{x: -4, y: 2}, {x: -20, y: 2}, {x: -20, y: 6}] }));
